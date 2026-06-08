@@ -19,7 +19,8 @@ DECLARE
   tenant_tables text[] := ARRAY[
     'org', 'academic_session', 'app_user', 'user_identifier', 'org_membership',
     'course', 'class', 'enrollment', 'student_profile', 'iep_goal',
-    'goal_progress', 'metric_event', 'certification', 'media_engagement'
+    'curriculum_objective', 'goal_progress', 'metric_event', 'certification',
+    'media_engagement'
   ];
 BEGIN
   FOREACH t IN ARRAY tenant_tables LOOP

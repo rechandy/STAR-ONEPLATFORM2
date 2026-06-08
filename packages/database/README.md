@@ -17,7 +17,8 @@ production these modules split across service-owned databases (see
 | Identity | `User` (incl. `SPECIALIST` role + `staffDiscipline`), `UserIdentifier`, `OrgMembership` | IAM + Roster Graph |
 | Roster | `Course`, `Class` (section, incl. related-service caseloads), `Enrollment` | Roster Graph |
 | Student | `StudentProfile` | Student Record |
-| IEP (Links↔SOLER bridge) | `IepGoal` | Curriculum + Assessment |
+| Curriculum (Links) | `CurriculumObjective` | Curriculum |
+| IEP (Links↔SOLER bridge) | `IepGoal` (→ `CurriculumObjective`) | Curriculum + Assessment |
 | Outcomes | `GoalProgress`, `MetricEvent` (canonical, append-only) | Student Record / SOLER |
 | SOLS (extension) | `Certification` | Learning & Certification |
 | Media (extension) | `MediaEngagement` | Media Center |
@@ -79,7 +80,8 @@ users: 1061                    (1000 students + 40 teachers + 10 admins + 11 spe
 classes (sections): 242        (200 academic + 42 related-service caseloads)
 enrollments: 5565              (232 teacher + 42 specialist + 5291 student)
 studentProfiles: 1000
-iepGoals: 4267
+curriculumObjectives: 40        (Links objectives; every IEP goal links to one)
+iepGoals: 4267                  (4267 linked to a curriculum objective)
 goalProgress: 4267
 metricEvents: 6308             (4267 ACCURACY_SNAPSHOT + 2041 OBJECTIVE_MASTERED)
 
@@ -95,6 +97,8 @@ The seed is **idempotent** (deterministic ids + `skipDuplicates`) — safe to re
 - `data/demo_users.json` → `User` (TEACHER/ADMINISTRATOR) + `OrgMembership` to their school.
 - `data/star_iep_dataset.csv`:
   - distinct `student_id` → `User` (STUDENT) + `StudentProfile` (age/grade/diagnosis)
+  - distinct `(domain, goal description)` → `CurriculumObjective` (a Links objective);
+    every `IepGoal` links to its objective
   - each row → `IepGoal` (+ `GoalProgress` snapshot) and one or two canonical `MetricEvent`s
   - **synthesized many-to-many roster:** one `Course` per domain; one `Class` *section* per
     `(teacher × domain)`; the teacher is enrolled in each of their sections, and each student

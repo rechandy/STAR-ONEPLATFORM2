@@ -469,6 +469,33 @@ async function main() {
   );
 
   // ==========================================================================
+  // Links curriculum objectives — derive one objective per distinct
+  // (domain, goal description). Each IEP goal then links to a real objective.
+  console.log('\nSeeding Links curriculum objectives...');
+  const objectiveByKey = new Map<string, { id: string; domain: GoalDomain; title: string; code: string }>();
+  const perDomainSeq = new Map<GoalDomain, number>();
+  for (const r of goalRows) {
+    const domain = domainOf(r.goal_domain);
+    const key = `${domain}||${r.goal_description}`;
+    if (objectiveByKey.has(key)) continue;
+    const seq = (perDomainSeq.get(domain) ?? 0) + 1;
+    perDomainSeq.set(domain, seq);
+    const code = `LINKS-${DOMAIN_META[domain].code.toUpperCase()}-${String(seq).padStart(3, '0')}`;
+    objectiveByKey.set(key, { id: `obj-${code}`, domain, title: r.goal_description, code });
+  }
+  const objectiveIdForRow = (r: GoalRow) =>
+    objectiveByKey.get(`${domainOf(r.goal_domain)}||${r.goal_description}`)!.id;
+
+  const objectives = [...objectiveByKey.values()].map((o) => ({
+    id: o.id, tenantId: TENANT_ID, sourcedId: o.code, domain: o.domain,
+    code: o.code, title: o.title, courseId: courseIdFor(o.domain),
+    sequence: Number(o.code.slice(-3)),
+  }));
+  await chunkedCreate('curriculum objectives', objectives, (batch) =>
+    prisma.curriculumObjective.createMany({ skipDuplicates: true, data: batch }),
+  );
+
+  // ==========================================================================
   console.log('\nSeeding IEP goals, progress & metric events...');
   const goals = goalRows.map((r) => ({
     id: r.goal_id, tenantId: TENANT_ID, sourcedId: r.goal_id,
@@ -478,6 +505,7 @@ async function main() {
       : null,
     domain: domainOf(r.goal_domain),
     description: r.goal_description,
+    curriculumObjectiveId: objectiveIdForRow(r),
     iepStartDate: new Date(r.iep_start_date), iepEndDate: new Date(r.iep_end_date),
     daysRemainingToReview: Number(r.days_remaining_to_review) || null,
     status: r.goal_met === '1' ? GoalStatus.MET : GoalStatus.ACTIVE,
@@ -557,7 +585,11 @@ async function main() {
     '  ↳ specialist enrollments': specialistEnr,
     '  ↳ student enrollments': studentEnr,
     studentProfiles: await prisma.studentProfile.count({ where }),
+    curriculumObjectives: await prisma.curriculumObjective.count({ where }),
     iepGoals: await prisma.iepGoal.count({ where }),
+    '  ↳ linked to an objective': await prisma.iepGoal.count({
+      where: { ...where, curriculumObjectiveId: { not: null } },
+    }),
     goalProgress: await prisma.goalProgress.count({ where }),
     metricEvents: await prisma.metricEvent.count({ where }),
   });

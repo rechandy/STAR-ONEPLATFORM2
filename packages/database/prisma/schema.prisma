@@ -139,19 +139,20 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orgs             Org[]
-  academicSessions AcademicSession[]
-  users            User[]
-  orgMemberships   OrgMembership[]
-  courses          Course[]
-  classes          Class[]
-  enrollments      Enrollment[]
-  studentProfiles  StudentProfile[]
-  iepGoals         IepGoal[]
-  goalProgress     GoalProgress[]
-  metricEvents     MetricEvent[]
-  certifications   Certification[]
-  mediaEngagements MediaEngagement[]
+  orgs                 Org[]
+  academicSessions     AcademicSession[]
+  users                User[]
+  orgMemberships       OrgMembership[]
+  courses              Course[]
+  classes              Class[]
+  enrollments          Enrollment[]
+  studentProfiles      StudentProfile[]
+  iepGoals             IepGoal[]
+  goalProgress         GoalProgress[]
+  metricEvents         MetricEvent[]
+  certifications       Certification[]
+  mediaEngagements     MediaEngagement[]
+  curriculumObjectives CurriculumObjective[]
 
   @@map("tenant")
 }
@@ -297,9 +298,10 @@ model Course {
   status           EntityStatus @default(ACTIVE)
   dateLastModified DateTime     @default(now()) @updatedAt @map("date_last_modified")
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  org     Org     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  classes Class[]
+  tenant     Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  org        Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  classes    Class[]
+  objectives CurriculumObjective[]
 
   @@unique([tenantId, sourcedId])
   @@index([tenantId])
@@ -406,23 +408,53 @@ model IepGoal {
   daysRemainingToReview Int?       @map("days_remaining_to_review")
   status                GoalStatus @default(ACTIVE)
   goalMet               Boolean    @default(false) @map("goal_met")
-  /// Forward link to a Links curriculum objective (filled when Curriculum exists).
+  /// Link to the Links curriculum objective this IEP goal is derived from.
   curriculumObjectiveId String?    @map("curriculum_objective_id")
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
 
-  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student      StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  authoredBy   User           @relation("GoalAuthor", fields: [authoredById], references: [id])
-  class        Class?         @relation(fields: [classId], references: [id])
-  progress     GoalProgress?
-  metricEvents MetricEvent[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student             StudentProfile       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  authoredBy          User                 @relation("GoalAuthor", fields: [authoredById], references: [id])
+  class               Class?               @relation(fields: [classId], references: [id])
+  curriculumObjective CurriculumObjective? @relation(fields: [curriculumObjectiveId], references: [id])
+  progress            GoalProgress?
+  metricEvents        MetricEvent[]
 
   @@unique([tenantId, sourcedId])
   @@index([tenantId])
   @@index([studentId])
   @@index([domain])
+  @@index([curriculumObjectiveId])
   @@map("iep_goal")
+}
+
+/// A Links curriculum objective (the scope-&-sequence target an IEP goal is
+/// written from). Owned by the per-domain Links Course. This is the real
+/// curriculum entity that IepGoal.curriculumObjective points at.
+model CurriculumObjective {
+  id          String       @id @default(cuid())
+  tenantId    String       @map("tenant_id")
+  sourcedId   String       @map("sourced_id")
+  domain      GoalDomain
+  code        String // e.g. LINKS-COMM-001
+  title       String
+  description String?
+  courseId    String?      @map("course_id")
+  sequence    Int          @default(0)
+  status      EntityStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  course   Course?   @relation(fields: [courseId], references: [id])
+  iepGoals IepGoal[]
+
+  @@unique([tenantId, sourcedId])
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([domain])
+  @@map("curriculum_objective")
 }
 
 // ----------------------------------------------------------------------------
