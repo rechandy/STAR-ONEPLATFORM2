@@ -5,12 +5,14 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { SyncModule } from './sync/sync.module';
 import { OutcomesModule } from './outcomes/outcomes.module';
+import { MessagingModule } from './messaging/messaging.module';
 import { TenantContextMiddleware } from './common/tenant-context.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
     PrismaModule,
+    MessagingModule,
     HealthModule,
     SyncModule,
     OutcomesModule,

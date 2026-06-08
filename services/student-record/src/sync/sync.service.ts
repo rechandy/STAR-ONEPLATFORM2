@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MetricSource, MetricType, Prisma } from '@prisma/client';
+import { EVENT_TYPES, type StudentMetricV1 } from '@oneplatform/events';
 import { AuthzService } from '../authz/authz.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { isRecordable, validateOutcomeValue } from '../outcomes/taxonomy';
@@ -72,26 +73,62 @@ export class SyncService {
     }
 
     const occurredAt = new Date((p.occurredAt as string) ?? m.occurredAt ?? Date.now());
+    const goalId = typeof p.goalId === 'string' ? p.goalId : null;
+    const classId = typeof p.classId === 'string' ? p.classId : null;
+    const schemaVersion = typeof m.schemaVersion === 'number' ? m.schemaVersion : 1;
+
     try {
-      const created = await this.prisma.metricEvent.create({
-        data: {
+      // TRANSACTIONAL OUTBOX (ADR-0003): persist the metric AND its outbox event
+      // in one transaction. The relay publishes the outbox row asynchronously,
+      // so the DB commit and the event are atomic (no dual-write).
+      const created = await this.prisma.$transaction(async (tx) => {
+        const metric = await tx.metricEvent.create({
+          data: {
+            tenantId,
+            idempotencyKey: m.opId,
+            source: source as MetricSource,
+            metricType: metricType as MetricType,
+            studentId,
+            goalId,
+            classId,
+            recordedById: staffId,
+            value: (p.value ?? {}) as Prisma.InputJsonValue,
+            occurredAt,
+            schemaVersion,
+          },
+          select: { id: true },
+        });
+
+        const eventPayload: StudentMetricV1 = {
+          metricId: metric.id,
           tenantId,
-          idempotencyKey: m.opId,
-          source: source as MetricSource,
-          metricType: metricType as MetricType,
           studentId,
-          goalId: typeof p.goalId === 'string' ? p.goalId : null,
-          classId: typeof p.classId === 'string' ? p.classId : null,
+          goalId,
+          classId,
+          source,
+          metricType: metricType as string,
+          value: p.value ?? {},
+          occurredAt: occurredAt.toISOString(),
           recordedById: staffId,
-          value: (p.value ?? {}) as Prisma.InputJsonValue,
-          occurredAt,
-          schemaVersion: typeof m.schemaVersion === 'number' ? m.schemaVersion : 1,
-        },
-        select: { id: true },
+          schemaVersion,
+        };
+        await tx.outboxEvent.create({
+          data: {
+            tenantId,
+            aggregateType: 'MetricEvent',
+            aggregateId: metric.id,
+            type: EVENT_TYPES.STUDENT_METRIC_V1,
+            payload: eventPayload as unknown as Prisma.InputJsonValue,
+            occurredAt,
+            schemaVersion,
+          },
+        });
+        return metric;
       });
       return { opId: m.opId, status: 'applied', serverId: created.id };
     } catch (e) {
-      // Unique violation on (tenantId, idempotencyKey) => already applied.
+      // Unique violation on (tenantId, idempotencyKey) => already applied; the
+      // whole tx rolls back, so no orphan outbox row is written.
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         return { opId: m.opId, status: 'duplicate' };
       }

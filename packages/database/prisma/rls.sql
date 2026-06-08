@@ -20,7 +20,7 @@ DECLARE
     'org', 'academic_session', 'app_user', 'user_identifier', 'org_membership',
     'course', 'class', 'enrollment', 'student_profile', 'iep_goal',
     'curriculum_objective', 'goal_progress', 'metric_event', 'certification',
-    'media_engagement'
+    'media_engagement', 'outbox_event', 'outcome_rollup'
   ];
 BEGIN
   FOREACH t IN ARRAY tenant_tables LOOP

@@ -135,6 +135,13 @@ enum CertificationStatus {
   REVOKED
 }
 
+/// Lifecycle of a transactional-outbox row (ADR-0003).
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
 // ----------------------------------------------------------------------------
 // [TENANCY] — isolation boundary + org hierarchy
 // ----------------------------------------------------------------------------
@@ -161,6 +168,8 @@ model Tenant {
   certifications       Certification[]
   mediaEngagements     MediaEngagement[]
   curriculumObjectives CurriculumObjective[]
+  outboxEvents         OutboxEvent[]
+  outcomeRollups       OutcomeRollup[]
 
   @@map("tenant")
 }
@@ -565,4 +574,52 @@ model MediaEngagement {
   @@index([tenantId])
   @@index([userId])
   @@map("media_engagement")
+}
+
+// ----------------------------------------------------------------------------
+// [EVENT BACKBONE] — transactional outbox + a sample read-model projection
+// ----------------------------------------------------------------------------
+
+/// Transactional outbox (ADR-0003). A row is written in the SAME transaction as
+/// the domain change; a relay publishes PENDING rows to the broker and marks
+/// them PUBLISHED. No dual-write — DB commit and event are atomic.
+model OutboxEvent {
+  id            String       @id @default(cuid())
+  tenantId      String       @map("tenant_id")
+  aggregateType String       @map("aggregate_type")
+  aggregateId   String       @map("aggregate_id")
+  type          String // e.g. "student.metric.v1"
+  payload       Json
+  occurredAt    DateTime     @map("occurred_at")
+  schemaVersion Int          @default(1) @map("schema_version")
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  lastError     String?      @map("last_error")
+  publishedAt   DateTime?    @map("published_at")
+  createdAt     DateTime     @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([tenantId])
+  @@map("outbox_event")
+}
+
+/// A Reporting-style read model (CQRS, ADR-0004) maintained by a consumer of
+/// `student.metric.v1`. Demonstrates events propagating into a projection; in
+/// production this is owned by the Reporting service.
+model OutcomeRollup {
+  id             String    @id @default(cuid())
+  tenantId       String    @map("tenant_id")
+  studentId      String    @map("student_id")
+  totalMetrics   Int       @default(0) @map("total_metrics")
+  lastMetricType String?   @map("last_metric_type")
+  lastOccurredAt DateTime? @map("last_occurred_at")
+  updatedAt      DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, studentId])
+  @@index([tenantId])
+  @@map("outcome_rollup")
 }

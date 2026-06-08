@@ -100,10 +100,29 @@ cp services/student-record/.env.example services/student-record/.env
 pnpm --filter @oneplatform/student-record dev   # http://localhost:3002
 ```
 
+## Events (transactional outbox — ADR-0003)
+
+Every applied metric writes an `OutboxEvent` (`student.metric.v1`) **in the same
+transaction** as the `MetricEvent` — no dual-write. A background **relay**
+(`src/messaging/outbox-relay.service.ts`) publishes PENDING rows to the broker and marks
+them PUBLISHED; failures back off and land in FAILED after retries.
+
+The broker (`@oneplatform/events`) is an `InMemoryBroker` in dev and **Kafka/MSK** in
+production — the relay/consumers depend only on the interface. A demonstration consumer
+(`ReportingProjector`) maintains the `OutcomeRollup` read model, showing events propagate
+into a projection; in production **SOLER, Links, and Reporting** each subscribe to
+`student.metric` for their own read models.
+
+```
+POST /sync/mutations ──tx──> MetricEvent + OutboxEvent
+                                   │ relay (poll)
+                                   ▼
+                              Broker (Kafka in prod) ──► SOLER / Links / Reporting
+```
+
 ## Next steps
 
-- Emit a `student.metric.v1` domain event via the transactional outbox once the event
-  backbone exists (so SOLER/Links/Reporting consume it).
+- Bind the broker to Kafka/MSK (swap `brokerProvider`); or use Debezium CDC on the outbox.
 - Replace the co-located roster reads in `AuthzService` with a local roster read model fed
   by roster events.
 - Add `GET /api/sync/changes` for outcome pulls if a device needs to read back metrics.

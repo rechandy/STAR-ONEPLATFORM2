@@ -3,6 +3,7 @@ export interface AppConfig {
   nodeEnv: string;
   port: number;
   databaseUrl?: string;
+  relayPollMs: number;
 }
 
 export const configuration = (): AppConfig => ({
@@ -10,4 +11,5 @@ export const configuration = (): AppConfig => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 3002),
   databaseUrl: process.env.DATABASE_URL,
+  relayPollMs: Number(process.env.RELAY_POLL_MS ?? 500),
 });
