@@ -41,7 +41,6 @@ const TENANT_ID = 'star-demo';
 const TENANT_SLUG = 'star-demo';
 const DISTRICT_ID = 'org-star-demo-district';
 const TERM_ID = 'term-2025-2026';
-const COURSE_ID = 'course-star-services';
 const TERM_START = new Date('2025-08-01');
 const TERM_END = new Date('2026-06-30');
 const EMAIL_DOMAIN = 'stardemo.org';
@@ -58,7 +57,6 @@ const splitName = (name: string) => {
 };
 
 const orgIdFor = (school: string) => `org-${slug(school)}`;
-const classIdFor = (teacherId: string) => `class-${teacherId}`;
 
 const DOMAIN_MAP: Record<string, GoalDomain> = {
   'Academic Readiness': GoalDomain.ACADEMIC_READINESS,
@@ -67,6 +65,22 @@ const DOMAIN_MAP: Record<string, GoalDomain> = {
   'Daily Living': GoalDomain.DAILY_LIVING,
   'Social Skills': GoalDomain.SOCIAL_SKILLS,
 };
+
+// Per-domain metadata for the Links curriculum courses + section ids.
+const DOMAIN_META: Record<GoalDomain, { code: string; label: string }> = {
+  [GoalDomain.ACADEMIC_READINESS]: { code: 'acad', label: 'Academic Readiness' },
+  [GoalDomain.BEHAVIOR_SELF_REGULATION]: { code: 'behav', label: 'Behavior / Self-Regulation' },
+  [GoalDomain.COMMUNICATION]: { code: 'comm', label: 'Communication' },
+  [GoalDomain.DAILY_LIVING]: { code: 'daily', label: 'Daily Living' },
+  [GoalDomain.SOCIAL_SKILLS]: { code: 'social', label: 'Social Skills' },
+};
+
+const courseIdFor = (d: GoalDomain) => `course-${DOMAIN_META[d].code}`;
+// A section is a (teacher x domain) class; this is the many-to-many anchor.
+const sectionIdFor = (teacherId: string, d: GoalDomain) =>
+  `class-${teacherId}-${DOMAIN_META[d].code}`;
+const domainOf = (raw: string): GoalDomain =>
+  DOMAIN_MAP[raw] ?? GoalDomain.ACADEMIC_READINESS;
 
 async function chunkedCreate<T>(
   label: string,
@@ -160,15 +174,17 @@ async function main() {
     },
   });
 
-  await prisma.course.upsert({
-    where: { id: COURSE_ID },
-    update: {},
-    create: {
-      id: COURSE_ID, tenantId: TENANT_ID, sourcedId: 'star-services',
-      title: 'Specialized Instruction (STAR)', courseCode: 'STAR-SVC',
-      grades, subjectArea: 'Special Education', orgId: DISTRICT_ID,
-    },
+  // One district-level Links course per instructional domain. Sections (classes)
+  // are sections of these courses.
+  await prisma.course.createMany({
+    skipDuplicates: true,
+    data: (Object.keys(DOMAIN_META) as GoalDomain[]).map((d) => ({
+      id: courseIdFor(d), tenantId: TENANT_ID, sourcedId: DOMAIN_META[d].code,
+      title: `Links: ${DOMAIN_META[d].label}`, courseCode: `LINKS-${DOMAIN_META[d].code.toUpperCase()}`,
+      grades, subjectArea: DOMAIN_META[d].label, orgId: DISTRICT_ID,
+    })),
   });
+  console.log(`  ✓ courses: ${Object.keys(DOMAIN_META).length}`);
 
   // ==========================================================================
   console.log('\nSeeding users, identifiers & org memberships...');
@@ -216,30 +232,58 @@ async function main() {
   );
 
   // ==========================================================================
-  console.log('\nSeeding classes & enrollments...');
-  // one class per teacher (their caseload), at the teacher's school
-  const classes = users.teachers.map((t) => ({
-    id: classIdFor(t.id), tenantId: TENANT_ID, sourcedId: classIdFor(t.id),
-    title: `${t.name} – Caseload`, classCode: t.id, classType: 'homeroom',
-    courseId: COURSE_ID, schoolId: orgIdFor(t.school), termId: TERM_ID,
-  }));
-  await chunkedCreate('classes', classes, (batch) =>
+  // Many-to-many roster: a SECTION = (teacher x domain). A teacher runs many
+  // sections; a student is rostered into one section per domain they have goals
+  // in -> a student belongs to MANY classes. Both directions via Enrollment.
+  console.log('\nSeeding sections (classes) & enrollments...');
+
+  // Derive the set of sections actually present in the data.
+  const sectionKeys = new Map<string, { teacherId: string; domain: GoalDomain }>();
+  // Derive distinct student<->section memberships present in the data.
+  const studentSectionKeys = new Map<string, { studentId: string; teacherId: string; domain: GoalDomain }>();
+  for (const r of goalRows) {
+    if (!teacherById.has(r.teacher_id)) continue;
+    const domain = domainOf(r.goal_domain);
+    sectionKeys.set(`${r.teacher_id}|${domain}`, { teacherId: r.teacher_id, domain });
+    studentSectionKeys.set(`${r.student_id}|${r.teacher_id}|${domain}`, {
+      studentId: r.student_id, teacherId: r.teacher_id, domain,
+    });
+  }
+
+  const classes: Prisma.ClassCreateManyInput[] = [...sectionKeys.values()].map(
+    ({ teacherId, domain }) => {
+      const t = teacherById.get(teacherId)!;
+      const id = sectionIdFor(teacherId, domain);
+      return {
+        id, tenantId: TENANT_ID, sourcedId: id,
+        title: `${t.name} – ${DOMAIN_META[domain].label}`,
+        classCode: `${teacherId}-${DOMAIN_META[domain].code}`, classType: 'section',
+        focusDomain: domain, courseId: courseIdFor(domain),
+        schoolId: orgIdFor(t.school), termId: TERM_ID,
+      };
+    },
+  );
+  await chunkedCreate('sections (classes)', classes, (batch) =>
     prisma.class.createMany({ skipDuplicates: true, data: batch }),
   );
 
-  // enrollments: teachers into their class
-  const enrollments: Prisma.EnrollmentCreateManyInput[] = users.teachers.map((t) => ({
-    id: `enr-${t.id}`, tenantId: TENANT_ID, sourcedId: `enr-${t.id}`,
-    userId: t.id, classId: classIdFor(t.id), role: RoleType.TEACHER,
-    isPrimary: true, beginDate: TERM_START, endDate: TERM_END,
-  }));
-  // students into their teacher's class
-  for (const [sid, r] of studentById) {
-    if (!teacherById.has(r.teacher_id)) continue;
+  const enrollments: Prisma.EnrollmentCreateManyInput[] = [];
+  // teachers -> each of their sections
+  for (const { teacherId, domain } of sectionKeys.values()) {
+    const classId = sectionIdFor(teacherId, domain);
     enrollments.push({
-      id: `enr-${sid}`, tenantId: TENANT_ID, sourcedId: `enr-${sid}`,
-      userId: sid, classId: classIdFor(r.teacher_id), role: RoleType.STUDENT,
+      id: `enr-${teacherId}-${classId}`, tenantId: TENANT_ID, sourcedId: `enr-${teacherId}-${classId}`,
+      userId: teacherId, classId, role: RoleType.TEACHER,
       isPrimary: true, beginDate: TERM_START, endDate: TERM_END,
+    });
+  }
+  // students -> every section in which they have a goal (many classes per student)
+  for (const { studentId, teacherId, domain } of studentSectionKeys.values()) {
+    const classId = sectionIdFor(teacherId, domain);
+    enrollments.push({
+      id: `enr-${studentId}-${classId}`, tenantId: TENANT_ID, sourcedId: `enr-${studentId}-${classId}`,
+      userId: studentId, classId, role: RoleType.STUDENT,
+      isPrimary: false, beginDate: TERM_START, endDate: TERM_END,
     });
   }
   await chunkedCreate('enrollments', enrollments, (batch) =>
@@ -261,8 +305,10 @@ async function main() {
   const goals = goalRows.map((r) => ({
     id: r.goal_id, tenantId: TENANT_ID, sourcedId: r.goal_id,
     studentId: `sp-${r.student_id}`, authoredById: r.teacher_id,
-    classId: teacherById.has(r.teacher_id) ? classIdFor(r.teacher_id) : null,
-    domain: DOMAIN_MAP[r.goal_domain] ?? GoalDomain.ACADEMIC_READINESS,
+    classId: teacherById.has(r.teacher_id)
+      ? sectionIdFor(r.teacher_id, domainOf(r.goal_domain))
+      : null,
+    domain: domainOf(r.goal_domain),
     description: r.goal_description,
     iepStartDate: new Date(r.iep_start_date), iepEndDate: new Date(r.iep_end_date),
     daysRemainingToReview: Number(r.days_remaining_to_review) || null,
@@ -295,7 +341,8 @@ async function main() {
     const hasTeacher = teacherById.has(r.teacher_id);
     const base = {
       tenantId: TENANT_ID, source: MetricSource.SOLER, studentId: `sp-${r.student_id}`,
-      goalId: r.goal_id, classId: hasTeacher ? classIdFor(r.teacher_id) : null,
+      goalId: r.goal_id,
+      classId: hasTeacher ? sectionIdFor(r.teacher_id, domainOf(r.goal_domain)) : null,
       recordedById: hasTeacher ? r.teacher_id : null, occurredAt: NOW, schemaVersion: 1,
     };
     const list: Prisma.MetricEventCreateManyInput[] = [
@@ -327,16 +374,43 @@ async function main() {
   // ---- summary -------------------------------------------------------------
   console.log('\n✅ Seed complete. Tenant counts:');
   const where = { tenantId: TENANT_ID };
+  const teacherEnr = await prisma.enrollment.count({ where: { ...where, role: RoleType.TEACHER } });
+  const studentEnr = await prisma.enrollment.count({ where: { ...where, role: RoleType.STUDENT } });
   console.table({
     orgs: await prisma.org.count({ where }),
+    courses: await prisma.course.count({ where }),
     users: await prisma.user.count({ where }),
-    classes: await prisma.class.count({ where }),
+    'classes (sections)': await prisma.class.count({ where }),
     enrollments: await prisma.enrollment.count({ where }),
+    '  ↳ teacher enrollments': teacherEnr,
+    '  ↳ student enrollments': studentEnr,
     studentProfiles: await prisma.studentProfile.count({ where }),
     iepGoals: await prisma.iepGoal.count({ where }),
     goalProgress: await prisma.goalProgress.count({ where }),
     metricEvents: await prisma.metricEvent.count({ where }),
   });
+
+  // Demonstrate the many-to-many: a sample student in multiple classes.
+  const sample = await prisma.enrollment.findFirst({
+    where: { ...where, role: RoleType.STUDENT },
+    select: { userId: true },
+  });
+  if (sample) {
+    const classesForStudent = await prisma.enrollment.count({
+      where: { ...where, userId: sample.userId, role: RoleType.STUDENT },
+    });
+    const sectionsForTeacher = await prisma.enrollment.groupBy({
+      by: ['userId'],
+      where: { ...where, role: RoleType.TEACHER },
+      _count: { classId: true },
+      orderBy: { _count: { classId: 'desc' } },
+      take: 1,
+    });
+    console.log(
+      `M:N check → student ${sample.userId} is rostered in ${classesForStudent} classes; ` +
+        `busiest teacher runs ${sectionsForTeacher[0]?._count.classId ?? 0} sections.`,
+    );
+  }
 }
 
 main()

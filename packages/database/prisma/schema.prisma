@@ -296,8 +296,9 @@ model Course {
   @@map("course")
 }
 
-/// OneRoster `class` — a section taught at a school in a term. The unit a
-/// teacher works in; the anchor for "my classes / my students".
+/// OneRoster `class` — a SECTION taught at a school in a term. Many-to-many by
+/// design: a teacher runs many sections, and a student is rostered into many
+/// sections, both via `Enrollment`. `focusDomain` types domain-based sections.
 model Class {
   id               String       @id @default(cuid())
   tenantId         String       @map("tenant_id")
@@ -305,6 +306,7 @@ model Class {
   title            String
   classCode        String?      @map("class_code")
   classType        String?      @map("class_type")
+  focusDomain      GoalDomain?  @map("focus_domain")
   courseId         String       @map("course_id")
   schoolId         String       @map("school_id")
   termId           String       @map("term_id")
