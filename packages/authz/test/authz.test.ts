@@ -6,7 +6,7 @@ import {
   policiesParse,
   type StaffEntityInput,
   type StudentEntityInput,
-} from '../src/index.ts';
+} from '../src/index';
 
 // Fixtures mirror the verified roster-graph access set for student S00001
 // (Meadowbrook Academy): primary teacher T0026 + co-teacher + SLP/OT/BCBA.

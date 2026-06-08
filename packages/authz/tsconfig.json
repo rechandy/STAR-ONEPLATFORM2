@@ -1,9 +1,10 @@
 {
   "extends": "@oneplatform/tsconfig/base.json",
   "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "types": ["node"],
-    "noEmit": true,
-    "allowImportingTsExtensions": true
+    "noEmit": true
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }

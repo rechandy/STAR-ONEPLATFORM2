@@ -16,7 +16,12 @@ require the acting staff identity.
 | `GET /api/roster/my-classes` | Classes the staff teaches/serves | `x-tenant-id`, `x-user-id` |
 | `GET /api/roster/my-students` | Distinct students across all the staff's sections | `x-tenant-id`, `x-user-id` |
 | `GET /api/roster/my-caseload` | A specialist's related-service caseload | `x-tenant-id`, `x-user-id` |
-| `GET /api/roster/students/:id/access` | Full staff **access set** for a student | `x-tenant-id` |
+| `GET /api/roster/students/:id` 🔒 | Protected student detail (profile + goals + objectives) | `x-tenant-id`, `x-user-id` |
+| `GET /api/roster/students/:id/access` 🔒 | Full staff **access set** for a student | `x-tenant-id`, `x-user-id` |
+
+🔒 = enforced by `StudentAccessGuard` (Cedar `viewStudent`, see `@oneplatform/authz`). Staff
+not authorized for the student get **403**; missing `x-user-id` gets **401**. The self-scoped
+`my-*` endpoints need no per-student guard — the query itself is the access boundary.
 
 > `x-tenant-id` / `x-user-id` are stand-ins for the verified gateway/IAM claims (blueprint
 > §5.1–5.2). They make the multi-tenant + access contracts real from day one.

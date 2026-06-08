@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { RoleType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -121,6 +121,45 @@ export class RosterService {
     }
     const staff = [...byStaff.values()].sort((a, b) => a.id.localeCompare(b.id));
     return { studentId, staffCount: staff.length, staff };
+  }
+
+  /**
+   * Protected student detail (profile + IEP goals + linked Links objectives).
+   * Access to this is enforced by StudentAccessGuard (Cedar `viewStudent`).
+   */
+  async studentDetail(tenantId: string, studentId: string) {
+    const profile = await this.prisma.studentProfile.findFirst({
+      where: { tenantId, userId: studentId },
+      include: {
+        user: { select: { givenName: true, familyName: true } },
+        iepGoals: {
+          orderBy: { domain: 'asc' },
+          include: {
+            progress: { select: { currentAccuracy: true, currentPromptLevel: true, goalMet: true } },
+            curriculumObjective: { select: { code: true, title: true, domain: true } },
+          },
+        },
+      },
+    });
+    if (!profile) throw new NotFoundException(`Student ${studentId} not found.`);
+
+    return {
+      id: studentId,
+      name: `${profile.user.givenName} ${profile.user.familyName}`,
+      grade: profile.grade,
+      diagnosis: profile.primaryDiagnosis,
+      goals: profile.iepGoals.map((g) => ({
+        id: g.id,
+        domain: g.domain,
+        description: g.description,
+        goalMet: g.goalMet,
+        objective: g.curriculumObjective
+          ? { code: g.curriculumObjective.code, title: g.curriculumObjective.title }
+          : null,
+        currentAccuracy: g.progress?.currentAccuracy ?? null,
+        currentPromptLevel: g.progress?.currentPromptLevel ?? null,
+      })),
+    };
   }
 
   // -- helpers ---------------------------------------------------------------

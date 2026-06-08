@@ -2,12 +2,18 @@
   "name": "@oneplatform/authz",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "Cedar authorization policies + evaluation helpers for OnePlatform (ADR-0005).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
+  "files": ["dist", "cedar"],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "test": "node --import tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\""

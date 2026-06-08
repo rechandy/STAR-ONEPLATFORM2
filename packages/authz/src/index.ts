@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import * as cedar from '@cedar-policy/cedar-wasm/nodejs';
 import type { EntityJson } from '@cedar-policy/cedar-wasm/nodejs';
 
-const here = dirname(fileURLToPath(import.meta.url));
-
+// CommonJS build: __dirname is package/dist at runtime and package/src under tsx;
+// the cedar/ folder ships alongside (see package.json "files"), so ../cedar resolves
+// in both. (The package targets CommonJS so it can be consumed by the Nest services.)
 /** The Cedar policy text used for all OnePlatform student-access decisions. */
-export const POLICIES: string = readFileSync(resolve(here, '../cedar/policies.cedar'), 'utf8');
+export const POLICIES: string = readFileSync(resolve(__dirname, '../cedar/policies.cedar'), 'utf8');
 
 export type Action = 'viewStudent' | 'recordStudentData';
 export type Decision = 'allow' | 'deny';
