@@ -107,8 +107,10 @@ transaction** as the `MetricEvent` — no dual-write. A background **relay**
 (`src/messaging/outbox-relay.service.ts`) publishes PENDING rows to the broker and marks
 them PUBLISHED; failures back off and land in FAILED after retries.
 
-The broker (`@oneplatform/events`) is an `InMemoryBroker` in dev and **Kafka/MSK** in
-production — the relay/consumers depend only on the interface. A demonstration consumer
+The broker is selected by `EVENT_BROKER` (`memory` default, or `kafka`). With
+`EVENT_BROKER=kafka` + `KAFKA_BROKERS`, `EventBackbone` binds to Kafka/MSK via kafkajs
+(start a local broker with `infra/kafka/docker-compose.yml`). The relay/consumers depend
+only on the `Broker` interface. A demonstration consumer
 (`ReportingProjector`) maintains the `OutcomeRollup` read model, showing events propagate
 into a projection; in production **SOLER, Links, and Reporting** each subscribe to
 `student.metric` for their own read models.
