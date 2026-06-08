@@ -100,6 +100,10 @@ global state to write.
   than silent overwrite.
 - All sync is **idempotent and resumable** — a half-completed flush never duplicates data.
 
+> The full wire protocol — outbox record shape, push/pull payloads, cursor semantics, and
+> the retry/backoff state machine — is specified in
+> [`05-offline-sync-protocol.md`](05-offline-sync-protocol.md).
+
 ### Sync endpoints (BFF)
 
 - `GET /sync/roster?since=<cursor>` and `GET /sync/curriculum?since=<cursor>` — **delta
