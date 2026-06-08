@@ -43,7 +43,46 @@ into without tight coupling. That substrate is the **Unified Data Engine** (see
 - **Stack:** Best-fit recommendation (TypeScript/NestJS default + Go data-plane; Next.js web)
 - **Roster integration:** OneRoster / Clever / ClassLink as a **first-class, core capability**
 
+## Repository layout (Turborepo monorepo)
+
+```
+apps/
+  web/                     # Next.js PWA shell (installable, mobile/iPad-first)
+services/
+  service-template/        # golden-path NestJS service (tenancy, health, config)
+packages/
+  database/                # canonical OneRoster + outcomes Prisma schema, migrations, seed
+  tsconfig/                # shared TS config bases (base / nestjs / nextjs)
+infra/
+  terraform/               # AWS landing-zone stub
+docs/                      # architecture blueprint, data engine, roadmap, ADRs
+turbo.json, pnpm-workspace.yaml, eslint.config.mjs   # monorepo tooling
+```
+
+## Development (Phase 0)
+
+Prereqs: Node ≥ 20, `pnpm` (via `corepack enable`), Docker (for local Postgres).
+
+```bash
+corepack enable
+pnpm install
+
+pnpm dev          # run all apps/services (turbo)
+pnpm lint         # eslint across the workspace
+pnpm typecheck    # tsc --noEmit across the workspace
+pnpm build        # build everything
+
+# database (see packages/database/README.md)
+pnpm --filter @oneplatform/database db:up
+pnpm --filter @oneplatform/database db:migrate
+pnpm --filter @oneplatform/database db:seed
+```
+
+CI (`.github/workflows/ci.yml`) runs install → prisma generate → lint → typecheck → build → test
+on every push/PR.
+
 ## Status
 
-📐 Architecture / blueprint phase. No application code yet — this repository currently
-holds the foundational design that the build will follow.
+🏗️ **Phase 0 (foundations) in progress.** The Unified Data Engine schema + demo seed are in
+[`packages/database`](packages/database); the monorepo skeleton (Turborepo, service template,
+PWA shell, Terraform stub) is scaffolded. Architecture is documented under [`docs/`](docs/).

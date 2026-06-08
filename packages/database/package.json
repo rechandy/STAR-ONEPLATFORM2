@@ -14,7 +14,8 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
-    "db:rls": "node -e \"console.log('Apply prisma/rls.sql with: psql $DATABASE_URL -f prisma/rls.sql')\""
+    "db:rls": "node -e \"console.log('Apply prisma/rls.sql with: psql $DATABASE_URL -f prisma/rls.sql')\"",
+    "typecheck": "tsc --noEmit"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -10,6 +10,12 @@ build/
 out/
 *.tsbuildinfo
 
+# Turborepo
+.turbo/
+
+# Next.js
+next-env.d.ts
+
 # Go
 bin/
 vendor/

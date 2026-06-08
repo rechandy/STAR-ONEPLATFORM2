@@ -1,0 +1,6 @@
+# Copy to dev.tfvars and adjust. Usage:
+#   terraform plan  -var-file=environments/dev.tfvars
+#   terraform apply -var-file=environments/dev.tfvars
+project     = "oneplatform"
+environment = "dev"
+aws_region  = "us-east-1"

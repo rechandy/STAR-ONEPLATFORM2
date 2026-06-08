@@ -1,0 +1,99 @@
+:root {
+  /* Placeholder brand tokens — replace with STAR's official brand guidelines. */
+  --brand: #0b5cab;
+  --brand-ink: #0a2540;
+  --bg: #f6f8fb;
+  --card: #ffffff;
+  --muted: #5b6b7b;
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--brand-ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+}
+
+.shell {
+  max-width: 960px;
+  margin: 0 auto;
+  /* respect iPad/phone safe areas */
+  padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+}
+
+.hero {
+  text-align: center;
+  padding: 32px 0 8px;
+}
+
+.brand-star {
+  font-size: 44px;
+  color: var(--brand);
+  line-height: 1;
+}
+
+.hero h1 {
+  margin: 8px 0 4px;
+  font-size: clamp(28px, 6vw, 40px);
+}
+
+.hero p {
+  margin: 0 auto;
+  max-width: 48ch;
+  color: #44566b;
+}
+
+.pillars {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  margin-top: 28px;
+}
+
+@media (min-width: 640px) {
+  .pillars {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.pillar-card {
+  background: var(--card);
+  border: 1px solid #e6ecf3;
+  border-radius: var(--radius);
+  padding: 18px 18px 16px;
+  /* generous touch targets for tablet use */
+  min-height: 96px;
+}
+
+.pillar-card h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: var(--brand);
+}
+
+.pillar-card p {
+  margin: 0;
+  color: #44566b;
+  font-size: 15px;
+}
+
+.foot {
+  text-align: center;
+  color: #6b7a8d;
+  font-size: 13px;
+  margin-top: 28px;
+}
