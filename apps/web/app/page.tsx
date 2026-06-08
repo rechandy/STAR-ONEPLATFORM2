@@ -1,3 +1,5 @@
+import { OutboxDemo } from '@/components/OutboxDemo';
+
 const PILLARS = [
   { name: 'Links Curriculum', desc: 'Leveled, research-based curriculum teachers use to instruct.' },
   { name: 'SOLER', desc: 'Student Outcomes, Lessons, Evaluations & Reports — progress monitoring.' },
@@ -24,6 +26,8 @@ export default function HomePage() {
           </article>
         ))}
       </section>
+
+      <OutboxDemo />
 
       <footer className="foot">
         <p>Phase 0 shell · installable PWA · mobile &amp; iPad-first</p>

@@ -13,10 +13,15 @@ into it over later phases.
 - **Mobile/iPad ergonomics**: `viewport-fit=cover` + safe-area insets, responsive grid,
   generous touch targets, brand theme color.
 
-> Offline-first **data collection** (IndexedDB outbox + Background Sync) is intentionally
-> deferred to Phase 2 (SOLER), per
-> [`docs/architecture/04-client-and-mobile-strategy.md`](../../docs/architecture/04-client-and-mobile-strategy.md).
-> The SW must never cache authenticated student-PII responses.
+- **Offline-first outbox** (`lib/sync/`): an IndexedDB-backed outbox + flush engine wired to
+  `POST /sync/mutations` per
+  [`docs/architecture/05-offline-sync-protocol.md`](../../docs/architecture/05-offline-sync-protocol.md).
+  Captures are durable immediately; `flush()` posts batches, removes `applied`/`duplicate`,
+  parks `rejected` as `needs_attention`, and keeps the queue with full-jitter backoff on
+  offline/5xx/401. Auto-flushes on the browser `online` event. The `OutboxDemo` component
+  on the home page exercises it. Core engine is unit-tested (`pnpm --filter @oneplatform/web test`).
+
+> The service worker must never cache authenticated student-PII responses.
 
 ## Develop
 

@@ -91,6 +91,49 @@ body {
   font-size: 15px;
 }
 
+.outbox {
+  margin-top: 28px;
+  background: var(--card);
+  border: 1px solid #e6ecf3;
+  border-radius: var(--radius);
+  padding: 18px;
+}
+
+.outbox h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: var(--brand);
+}
+
+.outbox-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.outbox-actions button {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.outbox-actions button:last-child {
+  background: #fff;
+  color: var(--brand);
+}
+
+.outbox-status {
+  margin: 6px 0 0;
+  color: #44566b;
+  font-size: 14px;
+}
+
 .foot {
   text-align: center;
   color: #6b7a8d;
