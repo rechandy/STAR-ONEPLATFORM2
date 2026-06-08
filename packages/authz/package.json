@@ -1,0 +1,27 @@
+{
+  "name": "@oneplatform/authz",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cedar authorization policies + evaluation helpers for OnePlatform (ADR-0005).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\""
+  },
+  "dependencies": {
+    "@cedar-policy/cedar-wasm": "^4.4.1"
+  },
+  "devDependencies": {
+    "@oneplatform/tsconfig": "workspace:*",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^8.8.0",
+    "@typescript-eslint/parser": "^8.8.0",
+    "eslint": "^8.57.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}
