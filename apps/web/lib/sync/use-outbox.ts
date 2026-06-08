@@ -11,7 +11,8 @@ import {
 } from './index';
 
 const store = typeof window !== 'undefined' ? new IndexedDbStore() : null;
-const ENDPOINT = process.env.NEXT_PUBLIC_SYNC_URL ?? '';
+// Same-origin BFF route (app/api/sync/mutations) — forwards to student-record.
+const ENDPOINT = process.env.NEXT_PUBLIC_SYNC_URL ?? '/api/sync/mutations';
 const TENANT = process.env.NEXT_PUBLIC_TENANT ?? 'star-demo';
 
 /**

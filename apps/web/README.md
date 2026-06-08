@@ -21,6 +21,11 @@ into it over later phases.
   offline/5xx/401. Auto-flushes on the browser `online` event. The `OutboxDemo` component
   on the home page exercises it. Core engine is unit-tested (`pnpm --filter @oneplatform/web test`).
 
+- **BFF** (`app/api/sync/mutations/route.ts`): a same-origin route handler the outbox flushes
+  to; it forwards to the **student-record** service (`STUDENT_RECORD_URL`), injecting the
+  tenant + acting-staff identity **server-side** (production: from the verified session, not
+  the client). This makes the offline→online round-trip real without CORS.
+
 > The service worker must never cache authenticated student-PII responses.
 
 ## Develop
