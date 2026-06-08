@@ -58,11 +58,17 @@ cp .env.example .env
 pnpm install            # or npm install
 
 pnpm db:up              # start local Postgres (Docker)
-pnpm db:migrate         # create schema (prisma migrate dev)
+pnpm db:migrate         # apply versioned migrations (prisma migrate dev)
 psql "$DATABASE_URL" -f prisma/rls.sql   # (optional) enable RLS policies
 pnpm db:seed            # ingest demo_users.json + star_iep_dataset.csv
 pnpm db:studio          # browse the data
 ```
+
+**Versioned migrations:** the schema ships as SQL under
+[`prisma/migrations/`](prisma/migrations) (baseline `…_init`). Use `pnpm db:migrate` in
+development (creates/applies migrations) and `pnpm db:migrate:deploy`
+(`prisma migrate deploy`) in CI/production to apply the committed migrations without
+generating new ones.
 
 Expected seed summary (verified against PostgreSQL):
 
