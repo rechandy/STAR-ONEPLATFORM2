@@ -142,6 +142,20 @@ enum OutboxStatus {
   FAILED
 }
 
+/// The four OnePlatform product pillars (licensable).
+enum Product {
+  LINKS
+  SOLER
+  SOLS
+  MEDIA_CENTER
+}
+
+enum LicenseStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
 // ----------------------------------------------------------------------------
 // [TENANCY] — isolation boundary + org hierarchy
 // ----------------------------------------------------------------------------
@@ -170,6 +184,8 @@ model Tenant {
   curriculumObjectives CurriculumObjective[]
   outboxEvents         OutboxEvent[]
   outcomeRollups       OutcomeRollup[]
+  productLicenses      ProductLicense[]
+  guardianRelations    GuardianRelationship[]
 
   @@map("tenant")
 }
@@ -244,15 +260,17 @@ model User {
   status           EntityStatus       @default(ACTIVE)
   dateLastModified DateTime           @default(now()) @updatedAt @map("date_last_modified")
 
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   identifiers      UserIdentifier[]
   orgMemberships   OrgMembership[]
   enrollments      Enrollment[]
   studentProfile   StudentProfile?
-  authoredGoals    IepGoal[]         @relation("GoalAuthor")
-  recordedMetrics  MetricEvent[]     @relation("MetricRecorder")
+  authoredGoals    IepGoal[]              @relation("GoalAuthor")
+  recordedMetrics  MetricEvent[]          @relation("MetricRecorder")
   certifications   Certification[]
   mediaEngagements MediaEngagement[]
+  guardianLinks    GuardianRelationship[] @relation("GuardianLinks")
+  studentGuardians GuardianRelationship[] @relation("StudentGuardians")
 
   @@unique([tenantId, sourcedId])
   @@unique([tenantId, username])
@@ -622,4 +640,49 @@ model OutcomeRollup {
   @@unique([tenantId, studentId])
   @@index([tenantId])
   @@map("outcome_rollup")
+}
+
+// ----------------------------------------------------------------------------
+// [LICENSING & GUARDIANS] — product entitlements + parent/guardian links
+// ----------------------------------------------------------------------------
+
+/// A tenant's entitlement to a product pillar. The dashboard filters the four
+/// pillars by the tenant's ACTIVE (non-expired) licenses.
+model ProductLicense {
+  id        String        @id @default(cuid())
+  tenantId  String        @map("tenant_id")
+  product   Product
+  status    LicenseStatus @default(ACTIVE)
+  seats     Int?
+  startsAt  DateTime?     @map("starts_at")
+  expiresAt DateTime?     @map("expires_at")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, product])
+  @@index([tenantId])
+  @@map("product_license")
+}
+
+/// Links a guardian/parent User to a student User. A guardian may have several
+/// students; a student may have several guardians.
+model GuardianRelationship {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  guardianId String   @map("guardian_id")
+  studentId  String   @map("student_id")
+  relation   String?
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guardian User   @relation("GuardianLinks", fields: [guardianId], references: [id], onDelete: Cascade)
+  student  User   @relation("StudentGuardians", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, guardianId, studentId])
+  @@index([tenantId])
+  @@index([studentId])
+  @@index([guardianId])
+  @@map("guardian_relationship")
 }

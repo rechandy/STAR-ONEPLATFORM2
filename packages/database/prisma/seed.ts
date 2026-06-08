@@ -187,6 +187,20 @@ async function main() {
   });
   console.log(`  ✓ courses: ${Object.keys(DOMAIN_META).length}`);
 
+  // Product licenses: LINKS, SOLER, MEDIA_CENTER active; SOLS intentionally
+  // NOT licensed so the dashboard demonstrates pillar filtering.
+  await prisma.productLicense.createMany({
+    skipDuplicates: true,
+    data: (['LINKS', 'SOLER', 'MEDIA_CENTER'] as const).map((product) => ({
+      id: `lic-${product.toLowerCase()}`,
+      tenantId: TENANT_ID,
+      product,
+      status: 'ACTIVE' as const,
+      expiresAt: new Date('2027-07-31'),
+    })),
+  });
+  console.log('  ✓ product licenses: 3 (LINKS, SOLER, MEDIA_CENTER; SOLS unlicensed)');
+
   // ==========================================================================
   console.log('\nSeeding users, identifiers & org memberships...');
   type UserSeed = { id: string; given: string; family: string; role: RoleType; school: string; legacy: string };
