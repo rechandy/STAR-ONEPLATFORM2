@@ -14,8 +14,8 @@ production these modules split across service-owned databases (see
 | Module | Models | Owning service |
 | --- | --- | --- |
 | Tenancy | `Tenant`, `Org` (district→school), `AcademicSession` | Roster Graph |
-| Identity | `User`, `UserIdentifier`, `OrgMembership` | IAM + Roster Graph |
-| Roster | `Course`, `Class` (section), `Enrollment` | Roster Graph |
+| Identity | `User` (incl. `SPECIALIST` role + `staffDiscipline`), `UserIdentifier`, `OrgMembership` | IAM + Roster Graph |
+| Roster | `Course`, `Class` (section, incl. related-service caseloads), `Enrollment` | Roster Graph |
 | Student | `StudentProfile` | Student Record |
 | IEP (Links↔SOLER bridge) | `IepGoal` | Curriculum + Assessment |
 | Outcomes | `GoalProgress`, `MetricEvent` (canonical, append-only) | Student Record / SOLER |
@@ -31,9 +31,24 @@ every pillar (and the reporting lakehouse) reads and writes.
 
 **Many-to-many roster:** `Enrollment` is the User↔Class join, so a **teacher runs many
 sections** and a **student is rostered into many classes** — both directions are first-class.
-A `Class` is a *section*; in the seed each section is a `(teacher × instructional domain)`
-class that is a section of the per-domain Links `Course`. A student with goals in several
-domains is therefore enrolled in several classes.
+A `Class` is a *section*; in the seed each academic section is a `(teacher × instructional
+domain)` class that is a section of the per-domain Links `Course`. A student with goals in
+several domains is therefore enrolled in several classes.
+
+**Cross-teacher access (for the permissions model):** the seed also layers in the real-world
+staffing patterns districts rely on, so you can verify access rules:
+
+- **Co-teaching** — within a school, teacher pairs each co-teach one of the other's sections,
+  so a section can have **two teachers** (a teacher legitimately accessing another's students).
+- **Related-service specialists** — traveling **SLP / OT / BCBA** providers (role
+  `SPECIALIST`, with `staffDiscipline`) each cover several schools and keep a **caseload
+  section** per school (`Class.discipline` set). Students with a goal in the matching domain
+  are co-enrolled into the specialist's caseload — so a student is served by their primary
+  teacher **and** one or more specialists, often **across schools**.
+
+Net effect: most students are reachable by **more than one staff member through shared
+classes** — the exact condition your authorization layer (Cedar / RBAC, see
+[ADR-0005](../../docs/adr/0005-cedar-authorization.md)) must resolve correctly.
 
 ## Quick start
 
@@ -52,16 +67,19 @@ pnpm db:studio          # browse the data
 Expected seed summary (verified against PostgreSQL):
 
 ```
-orgs: 15            (1 district + 14 schools)
-courses: 5          (one Links course per instructional domain)
-users: 1050         (1000 students + 40 teachers + 10 admins)
-classes (sections): 200    (teacher × domain)
-enrollments: 4467   (200 teacher + 4267 student)
+orgs: 15                       (1 district + 14 schools)
+courses: 8                     (5 Links domains + 3 related-service disciplines)
+users: 1061                    (1000 students + 40 teachers + 10 admins + 11 specialists)
+classes (sections): 242        (200 academic + 42 related-service caseloads)
+enrollments: 5565              (232 teacher + 42 specialist + 5291 student)
 studentProfiles: 1000
 iepGoals: 4267
 goalProgress: 4267
-metricEvents: 6308  (4267 ACCURACY_SNAPSHOT + 2041 OBJECTIVE_MASTERED)
-M:N check → a student is rostered in up to 5 classes; a teacher runs up to 5 sections.
+metricEvents: 6308             (4267 ACCURACY_SNAPSHOT + 2041 OBJECTIVE_MASTERED)
+
+M:N check          → a student is rostered in up to 8 classes; a teacher runs up to 6 sections.
+Permissions check  → 831 students are accessible by 2+ distinct staff.
+Example            → student S00001: primary teacher + co-teacher + SLP + OT + BCBA.
 ```
 
 The seed is **idempotent** (deterministic ids + `skipDuplicates`) — safe to re-run.
@@ -107,4 +125,25 @@ prisma.iepGoal.findMany({
 
 // Unified outcomes feed (what Reporting / lakehouse consume)
 prisma.metricEvent.findMany({ where: { tenantId, metricType: 'OBJECTIVE_MASTERED' } });
+```
+
+### Permissions / cross-teacher access queries
+
+```ts
+// A specialist's caseload across all the schools they serve
+prisma.enrollment.findMany({
+  where: { tenantId, userId: 'SLP001', role: 'SPECIALIST' },
+  include: { class: { select: { title: true, schoolId: true, discipline: true } } },
+});
+
+// Every staff member who can access a given student (the access set to authorize):
+// 1) the student's classes  2) non-student enrollees in those classes
+const classes = await prisma.enrollment.findMany({
+  where: { tenantId, userId: 'S00001', role: 'STUDENT' },
+  select: { classId: true },
+});
+prisma.enrollment.findMany({
+  where: { tenantId, classId: { in: classes.map((c) => c.classId) }, role: { not: 'STUDENT' } },
+  include: { user: { select: { givenName: true, familyName: true, primaryRole: true, staffDiscipline: true } } },
+});
 ```

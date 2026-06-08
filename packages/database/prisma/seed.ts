@@ -25,6 +25,7 @@ import {
   SessionType,
   RoleType,
   IdentifierType,
+  ServiceDiscipline,
   GoalDomain,
   GoalStatus,
   MetricSource,
@@ -291,6 +292,173 @@ async function main() {
   );
 
   // ==========================================================================
+  // CROSS-TEACHER ACCESS: co-teaching + related-service specialists (SLP/OT/BCBA).
+  // Students are served by their primary teacher AND additional staff, so the
+  // permissions model must grant access across teachers and across schools.
+  console.log('\nSeeding co-teaching & related-service specialists...');
+
+  // per-student domains (which related services a student could need)
+  const studentDomains = new Map<string, Set<GoalDomain>>();
+  for (const r of goalRows) {
+    const set = studentDomains.get(r.student_id) ?? new Set<GoalDomain>();
+    set.add(domainOf(r.goal_domain));
+    studentDomains.set(r.student_id, set);
+  }
+  // each teacher's section domains (sorted for deterministic pairing)
+  const teacherDomains = new Map<string, GoalDomain[]>();
+  for (const { teacherId, domain } of sectionKeys.values()) {
+    const arr = teacherDomains.get(teacherId) ?? [];
+    arr.push(domain);
+    teacherDomains.set(teacherId, arr);
+  }
+  for (const arr of teacherDomains.values()) arr.sort();
+
+  const crossEnrollments: Prisma.EnrollmentCreateManyInput[] = [];
+  const enr = (userId: string, classId: string, role: RoleType, isPrimary = false) => ({
+    id: `enr-${userId}-${classId}`, tenantId: TENANT_ID, sourcedId: `enr-${userId}-${classId}`,
+    userId, classId, role, isPrimary, beginDate: TERM_START, endDate: TERM_END,
+  });
+
+  // --- (A) Co-teaching: within each school, pair teachers; each co-teaches one
+  //         of the other's sections -> two TEACHERS share one class. -----------
+  const teachersBySchool = new Map<string, string[]>();
+  for (const t of users.teachers) {
+    const arr = teachersBySchool.get(t.school) ?? [];
+    arr.push(t.id);
+    teachersBySchool.set(t.school, arr);
+  }
+  let coTeachCount = 0;
+  for (const ids of teachersBySchool.values()) {
+    const sorted = [...ids].sort();
+    for (let i = 0; i + 1 < sorted.length; i += 2) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      const aDomains = teacherDomains.get(a);
+      const bDomains = teacherDomains.get(b);
+      if (aDomains?.length) {
+        crossEnrollments.push(enr(b, sectionIdFor(a, aDomains[0]), RoleType.TEACHER));
+        coTeachCount++;
+      }
+      if (bDomains?.length) {
+        crossEnrollments.push(enr(a, sectionIdFor(b, bDomains[0]), RoleType.TEACHER));
+        coTeachCount++;
+      }
+    }
+  }
+
+  // --- (B) Related-service specialists: traveling SLP/OT/BCBA providers -------
+  interface DiscCfg {
+    prefix: string;
+    discipline: ServiceDiscipline;
+    domain: GoalDomain;
+    courseId: string;
+    courseTitle: string;
+    sectionLabel: string;
+    names: string[];
+  }
+  const SPECIALISTS: DiscCfg[] = [
+    {
+      prefix: 'SLP', discipline: ServiceDiscipline.SPEECH_LANGUAGE, domain: GoalDomain.COMMUNICATION,
+      courseId: 'course-rs-slp', courseTitle: 'Related Service: Speech-Language Therapy',
+      sectionLabel: 'Speech Therapy', names: ['Jordan Rivers', 'Maya Brooks', 'Devin Patel', 'Sara Lindqvist'],
+    },
+    {
+      prefix: 'OT', discipline: ServiceDiscipline.OCCUPATIONAL_THERAPY, domain: GoalDomain.DAILY_LIVING,
+      courseId: 'course-rs-ot', courseTitle: 'Related Service: Occupational Therapy',
+      sectionLabel: 'Occupational Therapy', names: ['Noah Bennett', 'Priya Shah', 'Marcus Webb', 'Hannah Cole'],
+    },
+    {
+      prefix: 'BX', discipline: ServiceDiscipline.BEHAVIOR, domain: GoalDomain.BEHAVIOR_SELF_REGULATION,
+      courseId: 'course-rs-bx', courseTitle: 'Related Service: Behavior Support',
+      sectionLabel: 'Behavior Support', names: ['Alexis Stone', 'Grace Okafor', 'Daniel Cho'],
+    },
+  ];
+  const CASELOAD_CAP = 25; // per (specialist x school) — keeps caseloads realistic
+
+  const schoolList = [...schools].sort();
+  const specialistUsers: Prisma.UserCreateManyInput[] = [];
+  const specialistIdentifiers: Prisma.UserIdentifierCreateManyInput[] = [];
+  const specialistMemberships: Prisma.OrgMembershipCreateManyInput[] = [];
+  const disciplineCourses: Prisma.CourseCreateManyInput[] = [];
+  const caseloadSections: Prisma.ClassCreateManyInput[] = [];
+  const caseloadCounts = new Map<string, number>();
+
+  for (const cfg of SPECIALISTS) {
+    disciplineCourses.push({
+      id: cfg.courseId, tenantId: TENANT_ID, sourcedId: cfg.courseId.replace('course-', ''),
+      title: cfg.courseTitle, courseCode: cfg.prefix, grades, subjectArea: cfg.sectionLabel, orgId: DISTRICT_ID,
+    });
+
+    const specIds: string[] = [];
+    cfg.names.forEach((name, i) => {
+      const id = `${cfg.prefix}${String(i + 1).padStart(3, '0')}`;
+      specIds.push(id);
+      const { givenName, familyName } = splitName(name);
+      specialistUsers.push({
+        id, tenantId: TENANT_ID, sourcedId: id, username: id, givenName, familyName,
+        email: `${slug(givenName)}.${slug(familyName)}.${id.toLowerCase()}@${EMAIL_DOMAIN}`,
+        primaryRole: RoleType.SPECIALIST, staffDiscipline: cfg.discipline,
+      });
+      specialistIdentifiers.push({
+        id: `uid-${id}-legacy`, tenantId: TENANT_ID, userId: id,
+        type: IdentifierType.STAR_LEGACY_ID, value: id,
+      });
+    });
+
+    // assign schools round-robin -> each school served by one specialist of this discipline
+    const schoolToSpec = new Map<string, string>();
+    schoolList.forEach((school, idx) => {
+      const specId = specIds[idx % specIds.length];
+      schoolToSpec.set(school, specId);
+      const schoolSlug = slug(school);
+      const classId = `class-${specId}-${schoolSlug}`;
+      specialistMemberships.push({
+        id: `om-${specId}-${schoolSlug}`, tenantId: TENANT_ID, userId: specId,
+        orgId: orgIdFor(school), role: RoleType.SPECIALIST, isPrimary: false,
+      });
+      caseloadSections.push({
+        id: classId, tenantId: TENANT_ID, sourcedId: classId,
+        title: `${cfg.sectionLabel} – ${school}`, classCode: `${specId}-${schoolSlug}`,
+        classType: 'related_service', focusDomain: cfg.domain, discipline: cfg.discipline,
+        courseId: cfg.courseId, schoolId: orgIdFor(school), termId: TERM_ID,
+      });
+      crossEnrollments.push(enr(specId, classId, RoleType.SPECIALIST, true));
+    });
+
+    // co-enroll students with a goal in this domain into their school's caseload (capped)
+    for (const [sid, r] of studentById) {
+      if (!studentDomains.get(sid)?.has(cfg.domain)) continue;
+      const specId = schoolToSpec.get(r.school);
+      if (!specId) continue;
+      const classId = `class-${specId}-${slug(r.school)}`;
+      const cnt = caseloadCounts.get(classId) ?? 0;
+      if (cnt >= CASELOAD_CAP) continue;
+      caseloadCounts.set(classId, cnt + 1);
+      crossEnrollments.push(enr(sid, classId, RoleType.STUDENT, false));
+    }
+  }
+
+  await chunkedCreate('specialists', specialistUsers, (b) =>
+    prisma.user.createMany({ skipDuplicates: true, data: b }),
+  );
+  await chunkedCreate('specialist identifiers', specialistIdentifiers, (b) =>
+    prisma.userIdentifier.createMany({ skipDuplicates: true, data: b }),
+  );
+  await chunkedCreate('specialist memberships', specialistMemberships, (b) =>
+    prisma.orgMembership.createMany({ skipDuplicates: true, data: b }),
+  );
+  await chunkedCreate('related-service courses', disciplineCourses, (b) =>
+    prisma.course.createMany({ skipDuplicates: true, data: b }),
+  );
+  await chunkedCreate('caseload sections', caseloadSections, (b) =>
+    prisma.class.createMany({ skipDuplicates: true, data: b }),
+  );
+  console.log(`  (co-teaching enrollments: ${coTeachCount})`);
+  await chunkedCreate('cross-teacher enrollments', crossEnrollments, (b) =>
+    prisma.enrollment.createMany({ skipDuplicates: true, data: b }),
+  );
+
+  // ==========================================================================
   console.log('\nSeeding student profiles...');
   const profiles = [...studentById.entries()].map(([sid, r]) => ({
     id: `sp-${sid}`, tenantId: TENANT_ID, userId: sid,
@@ -376,13 +544,17 @@ async function main() {
   const where = { tenantId: TENANT_ID };
   const teacherEnr = await prisma.enrollment.count({ where: { ...where, role: RoleType.TEACHER } });
   const studentEnr = await prisma.enrollment.count({ where: { ...where, role: RoleType.STUDENT } });
+  const specialistEnr = await prisma.enrollment.count({ where: { ...where, role: RoleType.SPECIALIST } });
   console.table({
     orgs: await prisma.org.count({ where }),
     courses: await prisma.course.count({ where }),
     users: await prisma.user.count({ where }),
+    '  ↳ specialists (SLP/OT/BCBA)': await prisma.user.count({ where: { ...where, primaryRole: RoleType.SPECIALIST } }),
     'classes (sections)': await prisma.class.count({ where }),
+    '  ↳ related-service caseloads': await prisma.class.count({ where: { ...where, discipline: { not: null } } }),
     enrollments: await prisma.enrollment.count({ where }),
     '  ↳ teacher enrollments': teacherEnr,
+    '  ↳ specialist enrollments': specialistEnr,
     '  ↳ student enrollments': studentEnr,
     studentProfiles: await prisma.studentProfile.count({ where }),
     iepGoals: await prisma.iepGoal.count({ where }),
@@ -390,7 +562,7 @@ async function main() {
     metricEvents: await prisma.metricEvent.count({ where }),
   });
 
-  // Demonstrate the many-to-many: a sample student in multiple classes.
+  // ---- many-to-many check --------------------------------------------------
   const sample = await prisma.enrollment.findFirst({
     where: { ...where, role: RoleType.STUDENT },
     select: { userId: true },
@@ -407,9 +579,53 @@ async function main() {
       take: 1,
     });
     console.log(
-      `M:N check → student ${sample.userId} is rostered in ${classesForStudent} classes; ` +
+      `\nM:N check → student ${sample.userId} is rostered in ${classesForStudent} classes; ` +
         `busiest teacher runs ${sectionsForTeacher[0]?._count.classId ?? 0} sections.`,
     );
+  }
+
+  // ---- permissions-model check: cross-teacher access -----------------------
+  // How many students are reachable by MORE THAN ONE distinct staff member
+  // (primary teacher + co-teacher and/or specialist) via shared classes?
+  const multiStaff = await prisma.$queryRaw<{ count: number }[]>`
+    SELECT count(*)::int AS count FROM (
+      SELECT se.user_id
+      FROM enrollment se
+      JOIN enrollment te ON te.class_id = se.class_id AND te.role <> 'STUDENT'
+      WHERE se.role = 'STUDENT' AND se.tenant_id = ${TENANT_ID}
+      GROUP BY se.user_id
+      HAVING count(DISTINCT te.user_id) > 1
+    ) x;`;
+  console.log(
+    `Permissions check → ${multiStaff[0]?.count ?? 0} students are accessible by 2+ distinct staff.`,
+  );
+
+  // Show the staff who can access one specialist-served student.
+  const served = await prisma.enrollment.findFirst({
+    where: { ...where, role: RoleType.STUDENT, class: { is: { discipline: { not: null } } } },
+    select: { userId: true },
+  });
+  if (served) {
+    const studentClasses = await prisma.enrollment.findMany({
+      where: { ...where, userId: served.userId, role: RoleType.STUDENT },
+      select: { classId: true },
+    });
+    const staff = await prisma.enrollment.findMany({
+      where: {
+        ...where,
+        classId: { in: studentClasses.map((c) => c.classId) },
+        role: { not: RoleType.STUDENT },
+      },
+      include: { user: { select: { givenName: true, familyName: true, primaryRole: true, staffDiscipline: true } }, class: { select: { title: true } } },
+    });
+    const seen = new Set<string>();
+    console.log(`\nStaff with access to student ${served.userId} (cross-teacher):`);
+    for (const s of staff) {
+      if (seen.has(s.userId)) continue;
+      seen.add(s.userId);
+      const disc = s.user.staffDiscipline ? ` / ${s.user.staffDiscipline}` : '';
+      console.log(`  • ${s.user.givenName} ${s.user.familyName} [${s.user.primaryRole}${disc}] — ${s.class.title}`);
+    }
   }
 }
 

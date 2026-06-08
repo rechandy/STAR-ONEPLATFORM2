@@ -51,10 +51,18 @@ enum RoleType {
   DISTRICT_ADMIN
   ADMINISTRATOR
   TEACHER
+  SPECIALIST // related-service provider (SLP / OT / BCBA) — cross-teacher access
   AIDE
   STUDENT
   GUARDIAN
   STAR_STAFF
+}
+
+/// Related-service discipline for specialist staff and their caseload sections.
+enum ServiceDiscipline {
+  SPEECH_LANGUAGE // SLP   -> Communication
+  OCCUPATIONAL_THERAPY // OT    -> Daily Living
+  BEHAVIOR // BCBA  -> Behavior / Self-Regulation
 }
 
 enum SessionType {
@@ -204,17 +212,19 @@ model AcademicSession {
 
 /// OneRoster `user`. One row per human (teacher, student, admin, aide...).
 model User {
-  id               String       @id @default(cuid())
-  tenantId         String       @map("tenant_id")
-  sourcedId        String       @map("sourced_id")
+  id               String             @id @default(cuid())
+  tenantId         String             @map("tenant_id")
+  sourcedId        String             @map("sourced_id")
   username         String
-  givenName        String       @map("given_name")
-  familyName       String       @map("family_name")
+  givenName        String             @map("given_name")
+  familyName       String             @map("family_name")
   email            String?
-  primaryRole      RoleType     @map("primary_role")
-  enabled          Boolean      @default(true)
-  status           EntityStatus @default(ACTIVE)
-  dateLastModified DateTime     @default(now()) @updatedAt @map("date_last_modified")
+  primaryRole      RoleType           @map("primary_role")
+  /// Set for SPECIALIST users (SLP/OT/BCBA); null for everyone else.
+  staffDiscipline  ServiceDiscipline? @map("staff_discipline")
+  enabled          Boolean            @default(true)
+  status           EntityStatus       @default(ACTIVE)
+  dateLastModified DateTime           @default(now()) @updatedAt @map("date_last_modified")
 
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   identifiers      UserIdentifier[]
@@ -300,18 +310,20 @@ model Course {
 /// design: a teacher runs many sections, and a student is rostered into many
 /// sections, both via `Enrollment`. `focusDomain` types domain-based sections.
 model Class {
-  id               String       @id @default(cuid())
-  tenantId         String       @map("tenant_id")
-  sourcedId        String       @map("sourced_id")
+  id               String             @id @default(cuid())
+  tenantId         String             @map("tenant_id")
+  sourcedId        String             @map("sourced_id")
   title            String
-  classCode        String?      @map("class_code")
-  classType        String?      @map("class_type")
-  focusDomain      GoalDomain?  @map("focus_domain")
-  courseId         String       @map("course_id")
-  schoolId         String       @map("school_id")
-  termId           String       @map("term_id")
-  status           EntityStatus @default(ACTIVE)
-  dateLastModified DateTime     @default(now()) @updatedAt @map("date_last_modified")
+  classCode        String?            @map("class_code")
+  classType        String?            @map("class_type")
+  focusDomain      GoalDomain?        @map("focus_domain")
+  /// Set for related-service caseload sections (SLP/OT/BCBA); null for academic sections.
+  discipline       ServiceDiscipline? @map("discipline")
+  courseId         String             @map("course_id")
+  schoolId         String             @map("school_id")
+  termId           String             @map("term_id")
+  status           EntityStatus       @default(ACTIVE)
+  dateLastModified DateTime           @default(now()) @updatedAt @map("date_last_modified")
 
   tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   course       Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
