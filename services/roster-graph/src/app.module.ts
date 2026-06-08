@@ -4,6 +4,8 @@ import { configuration } from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { RosterModule } from './roster/roster.module';
+import { MeModule } from './me/me.module';
+import { AdminModule } from './admin/admin.module';
 import { TenantContextMiddleware } from './common/tenant-context.middleware';
 
 @Module({
@@ -12,6 +14,8 @@ import { TenantContextMiddleware } from './common/tenant-context.middleware';
     PrismaModule,
     HealthModule,
     RosterModule,
+    MeModule,
+    AdminModule,
   ],
 })
 export class AppModule implements NestModule {

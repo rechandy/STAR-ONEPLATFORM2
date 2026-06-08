@@ -18,6 +18,14 @@ require the acting staff identity.
 | `GET /api/roster/my-caseload` | A specialist's related-service caseload | `x-tenant-id`, `x-user-id` |
 | `GET /api/roster/students/:id` 🔒 | Protected student detail (profile + goals + objectives) | `x-tenant-id`, `x-user-id` |
 | `GET /api/roster/students/:id/access` 🔒 | Full staff **access set** for a student | `x-tenant-id`, `x-user-id` |
+| `GET /api/me` | Acting user identity + org memberships (dashboard shell) | `x-tenant-id`, `x-user-id` |
+| `GET /api/licenses` | Tenant pillar entitlements (dashboard filtering) | `x-tenant-id` |
+| `POST /api/admin/teachers` 🔑 | Provision a teacher | `x-tenant-id`, `x-user-id` |
+| `POST /api/admin/students` 🔑 | Provision a student (+ profile) | `x-tenant-id`, `x-user-id` |
+| `POST /api/admin/parents` 🔑 | Provision a parent/guardian linked to a student | `x-tenant-id`, `x-user-id` |
+
+🔑 = admin onboarding, authorized by Cedar `manageRoster` on the target school (district
+admins anywhere; school admins for their school). Non-admins / wrong-school → **403**.
 
 🔒 = enforced by `StudentAccessGuard` (Cedar `viewStudent`, see `@oneplatform/authz`). Staff
 not authorized for the student get **403**; missing `x-user-id` gets **401**. The self-scoped

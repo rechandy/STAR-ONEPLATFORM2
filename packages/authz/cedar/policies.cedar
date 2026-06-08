@@ -52,3 +52,26 @@ when {
   principal.role == "ADMINISTRATOR" &&
   principal.schools.contains(resource.school)
 };
+
+// (5) District admins may MANAGE the roster (provision users) anywhere in tenant.
+permit (
+  principal,
+  action == Action::"manageRoster",
+  resource
+)
+when {
+  principal.tenant == resource.tenant &&
+  principal.role == "DISTRICT_ADMIN"
+};
+
+// (6) School admins may MANAGE the roster of a school they administer.
+permit (
+  principal,
+  action == Action::"manageRoster",
+  resource
+)
+when {
+  principal.tenant == resource.tenant &&
+  principal.role == "ADMINISTRATOR" &&
+  principal.schools.contains(resource.orgId)
+};

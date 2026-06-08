@@ -10,7 +10,15 @@ import type { EntityJson } from '@cedar-policy/cedar-wasm/nodejs';
 export const POLICIES: string = readFileSync(resolve(__dirname, '../cedar/policies.cedar'), 'utf8');
 
 export type Action = 'viewStudent' | 'recordStudentData';
+/** Org-scoped action (provisioning/roster management). */
+export type OrgAction = 'manageRoster';
 export type Decision = 'allow' | 'deny';
+
+/** Org resource projection for org-scoped decisions (e.g. manageRoster). */
+export interface OrgEntityInput {
+  id: string;
+  tenant: string;
+}
 
 /** Principal (staff) projection the policies need. Mirrors roster-graph data. */
 export interface StaffEntityInput {
@@ -49,6 +57,14 @@ export function studentEntity(s: StudentEntityInput): EntityJson {
   };
 }
 
+export function orgEntity(o: OrgEntityInput): EntityJson {
+  return {
+    uid: { type: 'Org', id: o.id },
+    attrs: { tenant: o.tenant, orgId: o.id },
+    parents: [],
+  };
+}
+
 /**
  * Evaluate a single student-access decision with Cedar.
  * Default-deny: returns 'allow' only if a permit policy matches.
@@ -81,6 +97,26 @@ export function isAuthorized(input: {
 /** Convenience boolean wrapper. */
 export function can(staff: StaffEntityInput, action: Action, student: StudentEntityInput): boolean {
   return isAuthorized({ staff, action, student }) === 'allow';
+}
+
+/** Org-scoped decision (e.g. `manageRoster` for admin provisioning). */
+export function canManageOrg(staff: StaffEntityInput, org: OrgEntityInput): boolean {
+  const answer = cedar.isAuthorized({
+    principal: { type: 'Staff', id: staff.id },
+    action: { type: 'Action', id: 'manageRoster' },
+    resource: { type: 'Org', id: org.id },
+    context: {},
+    policies: { staticPolicies: POLICIES },
+    entities: [
+      staffEntity(staff),
+      orgEntity(org),
+      { uid: { type: 'Action', id: 'manageRoster' }, attrs: {}, parents: [] },
+    ],
+  });
+  if (answer.type === 'failure') {
+    throw new Error(`Cedar evaluation failed: ${JSON.stringify(answer.errors)}`);
+  }
+  return answer.response.decision === 'allow';
 }
 
 /**

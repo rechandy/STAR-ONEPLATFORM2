@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   authorizedStaff,
   can,
+  canManageOrg,
   policiesParse,
   type StaffEntityInput,
   type StudentEntityInput,
@@ -164,6 +165,28 @@ describe('recordStudentData — narrower than view', () => {
   });
   it('denies unrelated staff', () => {
     assert.equal(can(unrelatedTeacher, 'recordStudentData', student), false);
+  });
+});
+
+describe('manageRoster — admin provisioning', () => {
+  // org ids match the fixtures' school naming (schoolAdmin*.schools).
+  const meadow = { id: 'meadowbrook-academy', tenant: TENANT };
+  const northstar = { id: 'northstar-academy', tenant: TENANT };
+
+  it('lets a district admin manage any org in tenant', () => {
+    assert.ok(canManageOrg(districtAdmin, meadow));
+    assert.ok(canManageOrg(districtAdmin, northstar));
+  });
+  it('lets a school admin manage their own school only', () => {
+    assert.ok(canManageOrg(schoolAdminMeadow, meadow));
+    assert.equal(canManageOrg(schoolAdminMeadow, northstar), false);
+  });
+  it('denies a teacher', () => {
+    assert.equal(canManageOrg(primaryTeacher, meadow), false);
+  });
+  it('denies cross-tenant admins', () => {
+    const otherTenantAdmin: StaffEntityInput = { ...districtAdmin, tenant: 'other-isd' };
+    assert.equal(canManageOrg(otherTenantAdmin, meadow), false);
   });
 });
 

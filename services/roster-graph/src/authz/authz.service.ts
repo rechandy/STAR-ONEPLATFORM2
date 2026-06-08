@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RoleType } from '@prisma/client';
 import {
   can,
+  canManageOrg,
   type Action,
   type StaffEntityInput,
   type StudentEntityInput,
@@ -30,6 +31,13 @@ export class AuthzService {
     ]);
     if (!staff || !student) return false;
     return can(staff, action, student);
+  }
+
+  /** Org-scoped capability (admin roster management / provisioning). */
+  async canManageOrg(tenantId: string, staffId: string, orgId: string): Promise<boolean> {
+    const staff = await this.staffEntity(tenantId, staffId);
+    if (!staff) return false;
+    return canManageOrg(staff, { id: orgId, tenant: tenantId });
   }
 
   private async staffEntity(tenantId: string, staffId: string): Promise<StaffEntityInput | null> {
