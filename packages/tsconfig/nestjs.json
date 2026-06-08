@@ -9,6 +9,7 @@
     "emitDecoratorMetadata": true,
     "target": "ES2022",
     "sourceMap": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "incremental": false
   }
 }
