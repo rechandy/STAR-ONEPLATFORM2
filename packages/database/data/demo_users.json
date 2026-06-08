@@ -1,0 +1,306 @@
+{
+  "teachers": [
+    {
+      "id": "T0001",
+      "name": "Penelope Harris",
+      "school": "Horizon Learning Center",
+      "role": "teacher"
+    },
+    {
+      "id": "T0002",
+      "name": "Andrew Lopez",
+      "school": "Horizon Learning Center",
+      "role": "teacher"
+    },
+    {
+      "id": "T0003",
+      "name": "Ella Rodriguez",
+      "school": "Bridgewood School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0004",
+      "name": "Mia Taylor",
+      "school": "Clearwater Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0005",
+      "name": "Zoey King",
+      "school": "Northstar Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0006",
+      "name": "Willow Wright",
+      "school": "Meadowbrook Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0007",
+      "name": "Leah Young",
+      "school": "Horizon Learning Center",
+      "role": "teacher"
+    },
+    {
+      "id": "T0008",
+      "name": "Layla Campbell",
+      "school": "Willowbrook School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0009",
+      "name": "Savannah Wilson",
+      "school": "Bridgewood School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0010",
+      "name": "Aubrey Harris",
+      "school": "Silver Lake Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0011",
+      "name": "Hazel Wilson",
+      "school": "Pine Valley School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0012",
+      "name": "Hannah Nelson",
+      "school": "Pine Valley School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0013",
+      "name": "Christopher Perez",
+      "school": "Meadowbrook Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0014",
+      "name": "Piper King",
+      "school": "Northstar Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0015",
+      "name": "Kennedy Garcia",
+      "school": "Mountain View Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0016",
+      "name": "Ryan Sanchez",
+      "school": "Sunrise Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0017",
+      "name": "Jack Scott",
+      "school": "Sunrise Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0018",
+      "name": "Luke Wilson",
+      "school": "Cedar Creek School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0019",
+      "name": "Jaxon Garcia",
+      "school": "Mountain View Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0020",
+      "name": "Lincoln Gonzalez",
+      "school": "Willowbrook School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0021",
+      "name": "Hannah Brown",
+      "school": "Cedar Creek School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0022",
+      "name": "James Wilson",
+      "school": "Maplewood Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0023",
+      "name": "Piper Hernandez",
+      "school": "Clearwater Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0024",
+      "name": "Gabriel Hill",
+      "school": "Maplewood Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0025",
+      "name": "Oliver Allen",
+      "school": "Northstar Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0026",
+      "name": "Oliver Williams",
+      "school": "Meadowbrook Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0027",
+      "name": "Liam Hernandez",
+      "school": "Mountain View Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0028",
+      "name": "Hazel Clark",
+      "school": "Meadowbrook Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0029",
+      "name": "Luke Green",
+      "school": "Meadowbrook Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0030",
+      "name": "Benjamin Martin",
+      "school": "Willowbrook School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0031",
+      "name": "Aiden Harris",
+      "school": "Cedar Creek School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0032",
+      "name": "Harper King",
+      "school": "Lakewood Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0033",
+      "name": "Elizabeth Brown",
+      "school": "Northstar Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0034",
+      "name": "Sofia Lewis",
+      "school": "Oakridge Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0035",
+      "name": "Lucy Sanchez",
+      "school": "Silver Lake Academy",
+      "role": "teacher"
+    },
+    {
+      "id": "T0036",
+      "name": "Caroline Rodriguez",
+      "school": "Cedar Creek School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0037",
+      "name": "Adrian Walker",
+      "school": "Maplewood Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0038",
+      "name": "Sophia Rodriguez",
+      "school": "Clearwater Elementary",
+      "role": "teacher"
+    },
+    {
+      "id": "T0039",
+      "name": "Piper Hill",
+      "school": "Bridgewood School",
+      "role": "teacher"
+    },
+    {
+      "id": "T0040",
+      "name": "Emilia Martinez",
+      "school": "Willowbrook School",
+      "role": "teacher"
+    }
+  ],
+  "administrators": [
+    {
+      "id": "A0001",
+      "name": "Carter Davis",
+      "school": "Meadowbrook Academy",
+      "role": "administrator"
+    },
+    {
+      "id": "A0002",
+      "name": "Amelia Martinez",
+      "school": "Oakridge Elementary",
+      "role": "administrator"
+    },
+    {
+      "id": "A0003",
+      "name": "Oliver Lopez",
+      "school": "Lakewood Academy",
+      "role": "administrator"
+    },
+    {
+      "id": "A0004",
+      "name": "Benjamin Wilson",
+      "school": "Maplewood Elementary",
+      "role": "administrator"
+    },
+    {
+      "id": "A0005",
+      "name": "Ellie Lee",
+      "school": "Bridgewood School",
+      "role": "administrator"
+    },
+    {
+      "id": "A0006",
+      "name": "Eleanor Anderson",
+      "school": "Silver Lake Academy",
+      "role": "administrator"
+    },
+    {
+      "id": "A0007",
+      "name": "Sebastian Davis",
+      "school": "Silver Lake Academy",
+      "role": "administrator"
+    },
+    {
+      "id": "A0008",
+      "name": "Caleb Lopez",
+      "school": "Northstar Academy",
+      "role": "administrator"
+    },
+    {
+      "id": "A0009",
+      "name": "Isabella Allen",
+      "school": "Oakridge Elementary",
+      "role": "administrator"
+    },
+    {
+      "id": "A0010",
+      "name": "Emma Nguyen",
+      "school": "Silver Lake Academy",
+      "role": "administrator"
+    }
+  ]
+}
