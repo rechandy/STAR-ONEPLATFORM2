@@ -2,9 +2,21 @@
 
 The Student Record & Outcomes service. It owns the **append-only `MetricEvent`** store and
 ingests offline-captured outcomes through the sync protocol, with **every write authorized
-by Cedar** before it persists.
+by Cedar** before it persists. It serves four outcome families:
 
-## Endpoint
+| Category | Metric types | Example payload |
+| --- | --- | --- |
+| **progress** | `TRIAL_SCORE`, `ACCURACY_SNAPSHOT`, `PROMPT_LEVEL_CHANGE` | `{ trials, correct, promptLevel }` |
+| **milestone** | `MILESTONE_ACHIEVED`, `OBJECTIVE_MASTERED` | `{ title }` (+ `goalId`) |
+| **assessment** | `ASSESSMENT_SCORED` | `{ instrument, score }` |
+| **behavior** | `BEHAVIOR_INCIDENT`, `BEHAVIOR_OBSERVATION` | `{ behavior, antecedent?, consequence?, intensity? }` |
+
+Each family has a validated `value` shape (`src/outcomes/taxonomy.ts`); invalid payloads are
+`rejected: invalid`.
+
+## Endpoints
+
+### Write (offline sync)
 
 ```
 POST /api/sync/mutations
@@ -52,6 +64,17 @@ Headers: `x-tenant-id`, `x-user-id` (acting staff). Missing staff identity → *
 | `applied` | persisted now |
 | `duplicate` | `opId` already applied (safe retry) |
 | `rejected` | `error.code`: `forbidden` (authz), `invalid`, `unsupported`, `internal` |
+
+### Read (protected by Cedar `viewStudent` via `StudentAccessGuard`)
+
+```
+GET /api/students/:studentId/outcomes?category=&type=&limit=&cursor=   # cursor-paginated log
+GET /api/students/:studentId/summary                                    # aggregated snapshot
+```
+
+`category` ∈ `progress | milestone | assessment | behavior`. Unauthorized staff → **403**,
+missing identity → **401**. The summary returns counts by category plus
+`milestonesAchieved`, `behaviorIncidents`, `assessmentsLogged`, and `lastAssessment`.
 
 ## Enforcement
 

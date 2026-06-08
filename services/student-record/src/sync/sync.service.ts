@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MetricSource, MetricType, Prisma } from '@prisma/client';
 import { AuthzService } from '../authz/authz.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { isRecordable, validateOutcomeValue } from '../outcomes/taxonomy';
 import type { MutationDto, MutationResult, SyncMutationsDto } from './dto';
 
-const METRIC_TYPES = new Set<string>(Object.values(MetricType));
 const METRIC_SOURCES = new Set<string>(Object.values(MetricSource));
 
 @Injectable()
@@ -48,11 +48,15 @@ export class SyncService {
     const source = typeof p.source === 'string' ? p.source : MetricSource.SOLER;
 
     if (!studentId) return reject(m.opId, 'invalid', 'payload.studentId is required');
-    if (!metricType || !METRIC_TYPES.has(metricType)) {
-      return reject(m.opId, 'invalid', `payload.metricType invalid: ${metricType}`);
+    if (!metricType || !isRecordable(metricType)) {
+      return reject(m.opId, 'invalid', `payload.metricType not a recordable outcome: ${metricType}`);
     }
     if (!METRIC_SOURCES.has(source)) {
       return reject(m.opId, 'invalid', `payload.source invalid: ${source}`);
+    }
+    const valueError = validateOutcomeValue(metricType, p.value);
+    if (valueError) {
+      return reject(m.opId, 'invalid', valueError);
     }
 
     // Authorization: the acting staff must be allowed to record data for this
