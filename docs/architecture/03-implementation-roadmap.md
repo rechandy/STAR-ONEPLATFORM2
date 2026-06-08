@@ -36,7 +36,10 @@ Deliverables:
 - Observability baseline: Managed Prometheus/Grafana, tracing, logging, Sentry.
 - Security guardrails: image signing, SBOM, dependency + IaC scanning, secret scanning.
 - **Design-system skeleton** with brand-token placeholders (wire real STAR tokens when
-  delivered) and an a11y test harness (axe).
+  delivered), responsive/touch tokens, and an a11y test harness (axe).
+- **PWA scaffolding**: web app manifest, service worker (app-shell caching), install flow,
+  and mobile performance budgets enforced in CI. (See
+  [`04-client-and-mobile-strategy.md`](04-client-and-mobile-strategy.md).)
 - ADR process live; ADRs 0001–0006 ratified.
 
 **Exit criteria:** a "hello-service" goes from commit → prod via the template with
@@ -87,6 +90,9 @@ Deliverables:
   sessions (trial-by-trial), evaluations, mastery, **report generation**.
 - Both services consume roster events into **local read models** and emit
   `student.metric.v1`.
+- **Offline-first data collection** in SOLER on real iPads: on-device outbox (IndexedDB),
+  idempotent batched sync, and delta-pull of roster/curriculum — validated in airplane mode.
+- BFF **delta-sync endpoints** (`/sync/roster`, `/sync/curriculum`, `/sync/metrics`).
 - **Student Record** consumes those metrics and publishes `student.progress.v1`; Curriculum
   subscribes to adapt instruction.
 - Unified web shell + brand design system hosting both pillars under one sign-in.
@@ -142,6 +148,8 @@ Deliverables:
 - Performance & load testing to district-scale; capacity plan; cost optimization.
 - DR game days (RTO/RPO validation), chaos testing, runbooks, on-call.
 - Optional service mesh (mTLS/traffic policy) as service count grows.
+- **MDM deployment hardening**: managed Web Clip distribution via Apple School Manager +
+  Jamf/Intune, managed app config, and a security review of on-device data handling.
 
 **Exit criteria:** production-ready for multi-district GA with security, accessibility,
 performance, and DR evidence signed off.

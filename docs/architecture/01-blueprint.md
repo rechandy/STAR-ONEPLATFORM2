@@ -260,6 +260,17 @@ OnePlatform presents one coherent, STAR-branded experience across pillars.
 - Per-pillar theming is allowed only via approved token variations (e.g., a pillar accent),
   never by diverging components — consistency and accessibility stay centralized.
 
+### Device access: PWA-first, offline-capable
+
+OnePlatform must be fully usable on **iPads, tablets, and phones**, not just desktops —
+iPads are ubiquitous in autism/special-education classrooms and SOLER data is captured on
+them in real time. The experience is delivered **mobile-first and touch-first** as an
+**installable Progressive Web App** with **offline-first data collection** (queue locally,
+sync when connectivity returns). The design system carries touch-target and responsive
+tokens so every pillar is tablet-ready by default. Full details, including the on-device
+sync model and MDM deployment to managed iPads/Chromebooks, are in
+[`04-client-and-mobile-strategy.md`](04-client-and-mobile-strategy.md).
+
 ---
 
 ## 7. C4 container view (Mermaid)

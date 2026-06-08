@@ -32,6 +32,7 @@ into without tight coupling. That substrate is the **Unified Data Engine** (see
 | --- | --- |
 | [`01-blueprint.md`](docs/architecture/01-blueprint.md) | The foundational architecture: principles, service catalog, tech stack, cross-cutting concerns, diagrams |
 | [`02-unified-data-engine.md`](docs/architecture/02-unified-data-engine.md) | Deep dive on the roster + metrics engine (the core challenge) |
+| [`04-client-and-mobile-strategy.md`](docs/architecture/04-client-and-mobile-strategy.md) | iPad/tablet/mobile delivery: PWA-first + offline-first data collection |
 | [`03-implementation-roadmap.md`](docs/architecture/03-implementation-roadmap.md) | Phased delivery plan, team topology, exit criteria |
 | [`docs/adr/`](docs/adr/) | Architecture Decision Records — the "why" behind each major choice |
 
