@@ -2,6 +2,7 @@ import type { Session } from '@/lib/auth/session';
 
 export const ROSTER_GRAPH_URL = process.env.ROSTER_GRAPH_URL ?? 'http://localhost:3001';
 export const STUDENT_RECORD_URL = process.env.STUDENT_RECORD_URL ?? 'http://localhost:3002';
+export const LINKS_URL = process.env.LINKS_URL ?? 'http://localhost:3004';
 
 /** Identity headers injected SERVER-SIDE from the session (never from the client). */
 export function identityHeaders(session: Session): Record<string, string> {
@@ -36,6 +37,30 @@ export async function fetchLicenses(session: Session): Promise<Licenses | null> 
     cache: 'no-store',
   });
   return res.ok ? ((await res.json()) as Licenses) : null;
+}
+
+export interface CurriculumObjectiveSummary {
+  id: string;
+  domain: string;
+  code: string;
+  title: string;
+  description: string | null;
+  sequence: number;
+  lessonCount: number;
+}
+
+export interface ScopeSequence {
+  count: number;
+  objectives: CurriculumObjectiveSummary[];
+}
+
+/** Links curriculum scope & sequence (read model the assignments are built from). */
+export async function fetchScopeSequence(session: Session): Promise<ScopeSequence | null> {
+  const res = await fetch(`${LINKS_URL}/api/curriculum/scope-sequence`, {
+    headers: identityHeaders(session),
+    cache: 'no-store',
+  });
+  return res.ok ? ((await res.json()) as ScopeSequence) : null;
 }
 
 /** Forward an admin provisioning POST to roster-graph with the session identity. */

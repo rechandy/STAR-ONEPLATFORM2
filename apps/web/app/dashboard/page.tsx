@@ -6,10 +6,10 @@ import { fetchLicenses, fetchMe } from '@/lib/api/services';
 export const dynamic = 'force-dynamic';
 
 const PILLARS = [
-  { product: 'LINKS', name: 'Links Curriculum', desc: 'Leveled, research-based curriculum for instruction.' },
-  { product: 'SOLER', name: 'SOLER', desc: 'Student Outcomes, Lessons, Evaluations & Reports.' },
-  { product: 'SOLS', name: 'STAR Online Learning', desc: 'Educator training & certification.' },
-  { product: 'MEDIA_CENTER', name: 'Media Center', desc: 'Instructional & reference video library.' },
+  { product: 'LINKS', name: 'Links Curriculum', desc: 'Leveled, research-based curriculum for instruction.', href: '/links' },
+  { product: 'SOLER', name: 'SOLER', desc: 'Student Outcomes, Lessons, Evaluations & Reports.', href: '/soler' },
+  { product: 'SOLS', name: 'STAR Online Learning', desc: 'Educator training & certification.', href: undefined },
+  { product: 'MEDIA_CENTER', name: 'Media Center', desc: 'Instructional & reference video library.', href: undefined },
 ];
 
 function roleLabel(role: string): string {
@@ -49,18 +49,30 @@ export default async function DashboardPage() {
       <section className="pillars" aria-label="Product pillars">
         {PILLARS.map((p) => {
           const ok = licensed.get(p.product) ?? false;
-          return (
-            <article key={p.product} className={`pillar-card ${ok ? '' : 'locked'}`}>
+          const openable = ok && !!p.href;
+          const body = (
+            <>
               <div className="pillar-head">
                 <h2>{p.name}</h2>
                 {!ok && <span className="badge">Not licensed</span>}
               </div>
               <p>{p.desc}</p>
-              {ok ? (
+              {!ok ? (
+                <span className="muted">Not available for your district</span>
+              ) : openable ? (
                 <span className="open">Open →</span>
               ) : (
-                <span className="muted">Not available for your district</span>
+                <span className="muted">Coming soon</span>
               )}
+            </>
+          );
+          return openable ? (
+            <Link key={p.product} href={p.href!} className="pillar-card pillar-link">
+              {body}
+            </Link>
+          ) : (
+            <article key={p.product} className={`pillar-card ${ok ? '' : 'locked'}`}>
+              {body}
             </article>
           );
         })}
