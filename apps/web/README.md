@@ -4,6 +4,20 @@ The OnePlatform web shell — an installable, **mobile-first / iPad-first Progre
 App** built with Next.js (App Router). This is the Phase 0 shell; pillar experiences mount
 into it over later phases.
 
+## Gateway (login · dashboard · onboarding)
+
+- **`/login`** — demo sign-in; posts to `/api/auth/login`, which verifies the user via
+  roster-graph `/me` and sets an httpOnly session cookie. (Production: SSO/IAM-issued session.)
+- **`/dashboard`** — server component; reads the session, fetches `/me` + `/licenses` from
+  roster-graph, and renders the **four pillars filtered by the tenant's active licenses**
+  (unlicensed pillars show "Not licensed"). Admins see an Onboarding link.
+- **`/onboarding`** — admin-only; forms to add **teachers, students, and parents**, posting
+  to the admin BFF routes which forward to roster-graph with the **session identity injected
+  server-side**. Cedar `manageRoster` is enforced at the service — non-admins get 403.
+
+Identity/tenant are attached **server-side** from the session in every BFF route (never
+trusted from the client). Verified end-to-end (login → dashboard → onboarding, authz holds).
+
 ## What's wired up
 
 - **Installable PWA**: `app/manifest.ts` → `/manifest.webmanifest`, maskable SVG icon.

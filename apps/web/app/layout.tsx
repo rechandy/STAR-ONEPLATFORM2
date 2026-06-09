@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from 'next';
+import Link from 'next/link';
 import './globals.css';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
+import { SignOutButton } from '@/components/SignOutButton';
+import { getSession } from '@/lib/auth/session';
 
 export const metadata: Metadata = {
   title: 'STAR OnePlatform',
@@ -22,9 +25,28 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = getSession();
   return (
     <html lang="en">
       <body>
+        <header className="appbar">
+          <Link href="/" className="appbar-brand">
+            <span className="brand-star" aria-hidden>
+              ★
+            </span>
+            OnePlatform
+          </Link>
+          <nav className="appbar-nav">
+            {session ? (
+              <>
+                <Link href="/dashboard">Dashboard</Link>
+                <SignOutButton />
+              </>
+            ) : (
+              <Link href="/login">Sign in</Link>
+            )}
+          </nav>
+        </header>
         {children}
         <ServiceWorkerRegister />
       </body>

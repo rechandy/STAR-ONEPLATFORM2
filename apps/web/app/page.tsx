@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { OutboxDemo } from '@/components/OutboxDemo';
 
 const PILLARS = [
@@ -16,6 +17,14 @@ export default function HomePage() {
         </span>
         <h1>STAR OnePlatform</h1>
         <p>One platform connecting all four STAR pillars on a unified data engine.</p>
+        <div className="hero-cta">
+          <Link href="/login" className="btn">
+            Sign in
+          </Link>
+          <Link href="/dashboard" className="btn btn-ghost">
+            Open dashboard
+          </Link>
+        </div>
       </header>
 
       <section className="pillars" aria-label="Platform pillars">
