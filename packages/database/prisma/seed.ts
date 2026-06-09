@@ -30,6 +30,7 @@ import {
   GoalStatus,
   MetricSource,
   MetricType,
+  AssignmentStatus,
   EntityStatus,
 } from '@prisma/client';
 
@@ -510,6 +511,122 @@ async function main() {
   );
 
   // ==========================================================================
+  // Links lessons & curriculum assignments — the operational teaching layer.
+  // One lesson (a discrete-trial teaching routine) per objective; then
+  // assignments that mirror the IEP goals (student-targeted) plus a
+  // representative objective per section (class-targeted). Assignment status is
+  // derived from each goal's progress so the demo opens with a realistic mix of
+  // ASSIGNED / IN_PROGRESS / MASTERED — and the live SOLER -> Links metric flow
+  // advances them further (the projector keys on the raw student User.id, which
+  // is exactly the id used below).
+  console.log('\nSeeding Links lessons & curriculum assignments...');
+
+  const objectiveById = new Map(
+    [...objectiveByKey.values()].map((o) => [o.id, o]),
+  );
+  const objectiveForRow = (r: GoalRow) =>
+    objectiveByKey.get(`${domainOf(r.goal_domain)}||${r.goal_description}`)!;
+  const lessonIdForObjective = (code: string) => `lesson-${code}-01`;
+
+  // ---- lessons: one teaching routine per objective -------------------------
+  const lessons: Prisma.LessonCreateManyInput[] = [...objectiveByKey.values()].map((o) => ({
+    id: lessonIdForObjective(o.code),
+    tenantId: TENANT_ID,
+    objectiveId: o.id,
+    code: `${o.code}-L1`,
+    title: `Teaching routine: ${o.title}`,
+    sequence: 1,
+    steps: {
+      routine: 'discrete-trial',
+      domain: DOMAIN_META[o.domain].label,
+      steps: [
+        { order: 1, phase: 'antecedent', instruction: `Present the discriminative stimulus for "${o.title}".`, promptLevel: 'full' },
+        { order: 2, phase: 'response', instruction: 'Allow up to 5 seconds for the learner to respond.', promptLevel: 'partial' },
+        { order: 3, phase: 'consequence', instruction: 'Reinforce correct responses; use error correction and re-present on errors.', promptLevel: 'independent' },
+      ],
+      materials: ['target cards', 'reinforcer menu', 'data sheet'],
+    } as Prisma.InputJsonValue,
+    estimatedMinutes: 15,
+  }));
+  await chunkedCreate('lessons', lessons, (batch) =>
+    prisma.lesson.createMany({ skipDuplicates: true, data: batch }),
+  );
+
+  // ---- status derivation from each goal's progress -------------------------
+  const STATUS_RANK: Record<AssignmentStatus, number> = {
+    [AssignmentStatus.ASSIGNED]: 0,
+    [AssignmentStatus.IN_PROGRESS]: 1,
+    [AssignmentStatus.MASTERED]: 2,
+    [AssignmentStatus.ARCHIVED]: -1,
+  };
+  const statusForGoal = (r: GoalRow): AssignmentStatus => {
+    if (r.goal_met === '1') return AssignmentStatus.MASTERED;
+    const progressed =
+      Number(r.consecutive_progress_sessions) > 0 ||
+      Number(r.total_sessions) > 0 ||
+      Number(r.current_accuracy) > Number(r.baseline_accuracy);
+    return progressed ? AssignmentStatus.IN_PROGRESS : AssignmentStatus.ASSIGNED;
+  };
+
+  // ---- student-targeted assignments (mirror the IEP goals) -----------------
+  // Dedupe on (objective, student): NULL classId is distinct in the unique
+  // index, so createMany(skipDuplicates) would NOT collapse these — we must.
+  // When a student has multiple goals on one objective, keep the furthest along.
+  const studentAssignments = new Map<string, Prisma.CurriculumAssignmentCreateManyInput>();
+  for (const r of goalRows) {
+    const obj = objectiveForRow(r);
+    const sid = r.student_id; // raw User.id — the key the live projector matches
+    const key = `${obj.id}|${sid}`;
+    const status = statusForGoal(r);
+    const acc = Number(r.current_accuracy);
+    const candidate: Prisma.CurriculumAssignmentCreateManyInput = {
+      id: `asg-${obj.id}-${sid}`,
+      tenantId: TENANT_ID,
+      objectiveId: obj.id,
+      lessonId: lessonIdForObjective(obj.code),
+      studentId: sid,
+      assignedById: r.teacher_id,
+      status,
+      lastAccuracy: Number.isFinite(acc) ? acc : null,
+      masteredAt: status === AssignmentStatus.MASTERED ? NOW : null,
+    };
+    const prev = studentAssignments.get(key);
+    if (!prev || STATUS_RANK[status] > STATUS_RANK[prev.status as AssignmentStatus]) {
+      studentAssignments.set(key, candidate);
+    }
+  }
+
+  // ---- class-targeted assignments: the dominant objective per section ------
+  const sectionObjectives = new Map<string, { teacherId: string; counts: Map<string, number> }>();
+  for (const r of goalRows) {
+    if (!teacherById.has(r.teacher_id)) continue;
+    const sectionId = sectionIdFor(r.teacher_id, domainOf(r.goal_domain));
+    const entry = sectionObjectives.get(sectionId) ?? { teacherId: r.teacher_id, counts: new Map<string, number>() };
+    const objId = objectiveForRow(r).id;
+    entry.counts.set(objId, (entry.counts.get(objId) ?? 0) + 1);
+    sectionObjectives.set(sectionId, entry);
+  }
+  const classAssignments: Prisma.CurriculumAssignmentCreateManyInput[] = [
+    ...sectionObjectives.entries(),
+  ].map(([classId, { teacherId, counts }]) => {
+    const [objId] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    return {
+      id: `asg-${classId}-${objId}`,
+      tenantId: TENANT_ID,
+      objectiveId: objId,
+      lessonId: lessonIdForObjective(objectiveById.get(objId)!.code),
+      classId,
+      assignedById: teacherId,
+      status: AssignmentStatus.ASSIGNED,
+    };
+  });
+
+  const allAssignments = [...studentAssignments.values(), ...classAssignments];
+  await chunkedCreate('curriculum assignments', allAssignments, (batch) =>
+    prisma.curriculumAssignment.createMany({ skipDuplicates: true, data: batch }),
+  );
+
+  // ==========================================================================
   console.log('\nSeeding IEP goals, progress & metric events...');
   const goals = goalRows.map((r) => ({
     id: r.goal_id, tenantId: TENANT_ID, sourcedId: r.goal_id,
@@ -600,6 +717,12 @@ async function main() {
     '  ↳ student enrollments': studentEnr,
     studentProfiles: await prisma.studentProfile.count({ where }),
     curriculumObjectives: await prisma.curriculumObjective.count({ where }),
+    lessons: await prisma.lesson.count({ where }),
+    curriculumAssignments: await prisma.curriculumAssignment.count({ where }),
+    '  ↳ student-targeted': await prisma.curriculumAssignment.count({ where: { ...where, studentId: { not: null } } }),
+    '  ↳ class-targeted': await prisma.curriculumAssignment.count({ where: { ...where, classId: { not: null } } }),
+    '  ↳ mastered': await prisma.curriculumAssignment.count({ where: { ...where, status: AssignmentStatus.MASTERED } }),
+    '  ↳ in progress': await prisma.curriculumAssignment.count({ where: { ...where, status: AssignmentStatus.IN_PROGRESS } }),
     iepGoals: await prisma.iepGoal.count({ where }),
     '  ↳ linked to an objective': await prisma.iepGoal.count({
       where: { ...where, curriculumObjectiveId: { not: null } },
