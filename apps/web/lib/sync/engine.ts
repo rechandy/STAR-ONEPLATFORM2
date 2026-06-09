@@ -24,7 +24,8 @@ export async function enqueue(
   now: () => number = Date.now,
 ): Promise<OutboxRecord> {
   const t = now();
-  const occurredAt = input.payload.occurredAt ?? new Date(t).toISOString();
+  const occAt = input.payload.occurredAt;
+  const occurredAt = typeof occAt === 'string' ? occAt : new Date(t).toISOString();
   const rec: OutboxRecord = {
     opId: globalThis.crypto.randomUUID(),
     collection: input.collection,

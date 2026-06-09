@@ -340,3 +340,150 @@ body {
   color: #b00020;
   font-size: 14px;
 }
+
+/* ---- SOLER offline station ---- */
+.soler-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.pill-on {
+  background: #e3f5e9;
+  color: #1a7f37;
+}
+.pill-off {
+  background: #fdeaea;
+  color: #b00020;
+}
+.soler-form {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+}
+.soler-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  color: #44566b;
+}
+.soler-form select,
+.soler-form input {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #cdd7e2;
+  border-radius: 10px;
+  font-size: 15px;
+  background: #fff;
+}
+.soler-trials {
+  display: flex;
+  gap: 12px;
+}
+.soler-trials label {
+  flex: 1;
+}
+.outbox-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.soler-assignments {
+  margin-top: 16px;
+  border-top: 1px solid #e6ecf3;
+  padding-top: 12px;
+}
+.soler-assignments h3 {
+  font-size: 15px;
+  color: var(--brand);
+  margin: 0 0 8px;
+}
+.soler-assignments ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.soler-assignments li {
+  font-size: 14px;
+  color: #44566b;
+}
+.status {
+  display: inline-block;
+  min-width: 92px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #eef2f7;
+  color: #5b6b7b;
+}
+.status-mastered {
+  background: #e3f5e9;
+  color: #1a7f37;
+}
+.status-in_progress {
+  background: #fff4e0;
+  color: #9a6400;
+}
+.status-assigned {
+  background: #e8eefc;
+  color: #2b4eaa;
+}
+
+/* ---- pillar card as link ---- */
+.pillar-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.pillar-link:hover {
+  box-shadow: 0 6px 20px rgba(11, 92, 171, 0.15);
+  transform: translateY(-2px);
+}
+
+/* ---- Links curriculum scope & sequence ---- */
+.links-domains {
+  display: grid;
+  gap: 16px;
+}
+.objective-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.objective-list li {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-top: 1px solid #eef2f7;
+  font-size: 14px;
+}
+.objective-list li:first-child {
+  border-top: none;
+}
+.obj-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--brand);
+}
+.obj-title {
+  color: var(--brand-ink);
+}
+.obj-lessons {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}

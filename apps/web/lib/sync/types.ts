@@ -11,10 +11,15 @@ export interface OutcomePayload {
   [k: string]: unknown;
 }
 
+/** Canonical payload for a mutation — shape depends on collection/op. */
+export type SyncPayload = Record<string, unknown>;
+
 export interface MutationInput {
-  collection: 'metricEvent';
-  op: 'create';
-  payload: OutcomePayload;
+  /** metricEvent (Student Record) | session | trial (SOLER). */
+  collection: string;
+  /** create | finalize. */
+  op: string;
+  payload: SyncPayload;
 }
 
 export type OutboxStatus = 'pending' | 'synced' | 'needs_attention';
@@ -24,7 +29,7 @@ export interface OutboxRecord {
   collection: string;
   op: string;
   schemaVersion: number;
-  payload: OutcomePayload;
+  payload: SyncPayload;
   occurredAt: string;
   enqueuedAt: string;
   attempts: number;
@@ -53,4 +58,39 @@ export interface FlushSummary {
   rejected: number;
   /** left in the outbox for a future attempt (offline / 5xx / 429 / auth). */
   retry: number;
+}
+
+// ---- Pull / delta sync (protocol §4) --------------------------------------
+
+export interface ChangeRow {
+  id: string;
+  op: 'upsert' | 'delete';
+  version: number;
+  /** present on upsert; absent on delete (tombstone). */
+  row?: Record<string, unknown>;
+}
+
+export interface ChangesResponse {
+  serverTime: string;
+  changes: Record<string, ChangeRow[]>;
+  /** opaque compound cursor (all collections) — store and echo, never parse. */
+  nextCursor: string;
+  hasMore: boolean;
+}
+
+/** A cached server read-model row in the on-device `reference` store. */
+export interface ReferenceRow {
+  /** `${collection}:${id}` — the IndexedDB key. */
+  key: string;
+  collection: string;
+  id: string;
+  version: number;
+  row: Record<string, unknown>;
+}
+
+export interface PullSummary {
+  pages: number;
+  upserts: number;
+  deletes: number;
+  byCollection: Record<string, number>;
 }
