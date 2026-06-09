@@ -101,9 +101,9 @@ export function SolerStation({ staffId, tenantId }: { staffId: string; tenantId:
           type="button"
           disabled={busy}
           onClick={async () => {
-            const { push, pulled } = await sync();
+            const { push, pulled, upserts } = await sync();
             const p = push ? `pushed ${push.applied} applied / ${push.duplicate} dup / ${push.retry} retry` : 'nothing to push';
-            const d = pulled ? `pulled ${pulled.upserts} change(s)` : 'pull skipped (offline)';
+            const d = pulled ? `pulled ${upserts} change(s)` : 'pull skipped (offline)';
             setMsg(`Sync: ${p}; ${d}.`);
           }}
         >

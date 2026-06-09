@@ -172,8 +172,20 @@ export function useSoler(staffId = 'T0026', tenantId = 'star-demo') {
     setBusy(true);
     try {
       const push = await syncPush();
-      const pulled = await syncPull();
-      return { push, pulled };
+      // Pull, then reconcile: a pushed outcome is projected across services
+      // (e.g. Links advancing an assignment off the metric event) a beat AFTER
+      // the push returns, so an immediate pull can race ahead of it. Drain a few
+      // more times — each reappears with a higher watermark — until empty.
+      let pulled = await syncPull();
+      let upserts = pulled?.upserts ?? 0;
+      for (let i = 0; i < 4; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const more = await syncPull();
+        pulled = more;
+        upserts += more?.upserts ?? 0;
+        if (more && more.upserts === 0) break; // drained
+      }
+      return { push, pulled, upserts };
     } finally {
       setBusy(false);
     }
