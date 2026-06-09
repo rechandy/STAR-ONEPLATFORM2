@@ -156,6 +156,13 @@ enum LicenseStatus {
   SUSPENDED
 }
 
+/// Lifecycle of a SOLER trial-by-trial data-collection session.
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
 // ----------------------------------------------------------------------------
 // [TENANCY] — isolation boundary + org hierarchy
 // ----------------------------------------------------------------------------
@@ -186,6 +193,8 @@ model Tenant {
   outcomeRollups       OutcomeRollup[]
   productLicenses      ProductLicense[]
   guardianRelations    GuardianRelationship[]
+  dataCollectionSessions DataCollectionSession[]
+  trials               Trial[]
 
   @@map("tenant")
 }
@@ -685,4 +694,78 @@ model GuardianRelationship {
   @@index([studentId])
   @@index([guardianId])
   @@map("guardian_relationship")
+}
+
+// ----------------------------------------------------------------------------
+// [SOLER] — assessment & trial-by-trial data collection (Assessment service)
+// ----------------------------------------------------------------------------
+// SOLER owns these tables. Per ADR-0004 (db-per-service) they carry NO
+// cross-aggregate foreign keys — student/goal/class/staff are referenced by id
+// only (like `MetricEvent.studentId`), because in production these live in
+// SOLER's own database fed by roster events, not alongside the roster graph.
+// Only `tenant` is related, for dev-DB cascade + RLS consistency.
+
+/// A teacher-run data-collection session against an IEP goal. Trials are logged
+/// (often offline on iPad) under the session; on finalize SOLER computes
+/// accuracy and emits `student.metric.v1` so Student Record + Reporting update.
+model DataCollectionSession {
+  id            String        @id @default(cuid())
+  tenantId      String        @map("tenant_id")
+  /// User.id of the student (no FK — cross-aggregate; see header).
+  studentId     String        @map("student_id")
+  /// IepGoal.id this session collects data for (no FK — cross-aggregate).
+  goalId        String?       @map("goal_id")
+  /// Class.id the session was run in (no FK — cross-aggregate).
+  classId       String?       @map("class_id")
+  /// User.id of the staff member running the session (no FK — cross-aggregate).
+  recordedById  String        @map("recorded_by_id")
+  domain        GoalDomain
+  status        SessionStatus @default(IN_PROGRESS)
+  /// Prompt level in effect for the session (lower = more independent).
+  promptLevel   Int?          @map("prompt_level")
+  note          String?
+  /// Mastery threshold (accuracy in [0,1]) that marks the objective mastered.
+  masteryTarget Float?        @map("mastery_target")
+  totalTrials   Int           @default(0) @map("total_trials")
+  correctTrials Int           @default(0) @map("correct_trials")
+  accuracy      Float?
+  goalMastered  Boolean       @default(false) @map("goal_mastered")
+  /// Canonical MetricEvent.id emitted when the session was finalized.
+  metricEventId String?       @map("metric_event_id")
+  startedAt     DateTime      @default(now()) @map("started_at")
+  completedAt   DateTime?     @map("completed_at")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  trials Trial[]
+
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, goalId])
+  @@index([status])
+  @@map("data_collection_session")
+}
+
+/// A single discrete-trial datapoint within a session. `idempotencyKey` is the
+/// client opId from the offline outbox, making trial sync exactly-once-effect.
+model Trial {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  sessionId      String   @map("session_id")
+  idempotencyKey String   @map("idempotency_key")
+  ordinal        Int
+  correct        Boolean
+  promptLevel    Int?     @map("prompt_level")
+  note           String?
+  occurredAt     DateTime @map("occurred_at")
+  createdAt      DateTime @default(now())
+
+  tenant  Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  session DataCollectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId])
+  @@index([sessionId])
+  @@map("trial")
 }
