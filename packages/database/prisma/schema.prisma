@@ -163,6 +163,14 @@ enum SessionStatus {
   ABANDONED
 }
 
+/// Lifecycle of a Links curriculum assignment (advanced by student.metric.v1).
+enum AssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  MASTERED
+  ARCHIVED
+}
+
 // ----------------------------------------------------------------------------
 // [TENANCY] — isolation boundary + org hierarchy
 // ----------------------------------------------------------------------------
@@ -195,6 +203,8 @@ model Tenant {
   guardianRelations    GuardianRelationship[]
   dataCollectionSessions DataCollectionSession[]
   trials               Trial[]
+  lessons              Lesson[]
+  curriculumAssignments CurriculumAssignment[]
 
   @@map("tenant")
 }
@@ -490,9 +500,11 @@ model CurriculumObjective {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  course   Course?   @relation(fields: [courseId], references: [id])
-  iepGoals IepGoal[]
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  course      Course?                @relation(fields: [courseId], references: [id])
+  iepGoals    IepGoal[]
+  lessons     Lesson[]
+  assignments CurriculumAssignment[]
 
   @@unique([tenantId, sourcedId])
   @@unique([tenantId, code])
@@ -768,4 +780,71 @@ model Trial {
   @@index([tenantId])
   @@index([sessionId])
   @@map("trial")
+}
+
+// ----------------------------------------------------------------------------
+// [LINKS] — curriculum delivery: lessons + assignments (Curriculum service)
+// ----------------------------------------------------------------------------
+// Links owns Lesson + CurriculumAssignment. Lessons belong to a
+// CurriculumObjective (the scope-&-sequence target). Per ADR-0004 the
+// assignment *targets* (class/student) are referenced by id only — no
+// cross-aggregate FKs — since in production Links runs on its own DB fed by
+// roster events. Assignment progress is advanced by consuming `student.metric.v1`.
+
+/// A Links lesson delivering a curriculum objective — the scope-&-sequence leaf
+/// the teacher actually teaches. `steps` holds the ordered routine + materials.
+model Lesson {
+  id               String       @id @default(cuid())
+  tenantId         String       @map("tenant_id")
+  objectiveId      String       @map("objective_id")
+  code             String
+  title            String
+  sequence         Int          @default(0)
+  /// Ordered instructional steps + materials (the teaching routine), as JSON.
+  steps            Json
+  estimatedMinutes Int?         @map("estimated_minutes")
+  status           EntityStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  objective   CurriculumObjective    @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  assignments CurriculumAssignment[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([objectiveId])
+  @@map("lesson")
+}
+
+/// Assignment of a curriculum objective (optionally a specific lesson) to a
+/// class OR an individual student. Links' own read model; `status`/`lastAccuracy`
+/// are advanced by the metric consumer when SOLER outcomes arrive.
+model CurriculumAssignment {
+  id           String           @id @default(cuid())
+  tenantId     String           @map("tenant_id")
+  objectiveId  String           @map("objective_id")
+  lessonId     String?          @map("lesson_id")
+  /// Class.id when assigned to a section (no FK — cross-aggregate).
+  classId      String?          @map("class_id")
+  /// User.id when assigned to one student (no FK — cross-aggregate).
+  studentId    String?          @map("student_id")
+  /// User.id of the staff member who made the assignment.
+  assignedById String           @map("assigned_by_id")
+  status       AssignmentStatus @default(ASSIGNED)
+  lastAccuracy Float?           @map("last_accuracy")
+  masteredAt   DateTime?        @map("mastered_at")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  objective CurriculumObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  lesson    Lesson?             @relation(fields: [lessonId], references: [id])
+
+  @@unique([tenantId, objectiveId, classId, studentId])
+  @@index([tenantId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, classId])
+  @@index([objectiveId])
+  @@map("curriculum_assignment")
 }
