@@ -53,3 +53,6 @@ Thumbs.db
 *.log
 coverage/
 .nyc_output/
+
+# Generated demo audio (regenerate via docs/demo/generate_narration.py)
+docs/demo/output/
