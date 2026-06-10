@@ -20,6 +20,12 @@ next-env.d.ts
 bin/
 vendor/
 
+# Python (prediction service)
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
 # Environment & secrets
 .env
 .env.*

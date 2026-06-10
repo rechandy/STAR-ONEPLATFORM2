@@ -38,13 +38,21 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      {me.isAdmin && (
-        <div className="admin-cta">
+      <div className="admin-cta">
+        <Link href="/students" className="btn">
+          My students &amp; risk →
+        </Link>
+        {me.isAdmin && (
+          <Link href="/insights" className="btn">
+            Leadership insights →
+          </Link>
+        )}
+        {me.isAdmin && (
           <Link href="/onboarding" className="btn">
             Onboarding &amp; roster →
           </Link>
-        </div>
-      )}
+        )}
+      </div>
 
       <section className="pillars" aria-label="Product pillars">
         {PILLARS.map((p) => {

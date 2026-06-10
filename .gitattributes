@@ -1,6 +1,7 @@
 # Treat PDFs and other binaries as binary — never apply EOL normalization
 # (otherwise autocrlf corrupts them on checkout).
 *.pdf binary
+*.joblib binary
 *.png binary
 *.jpg binary
 *.jpeg binary

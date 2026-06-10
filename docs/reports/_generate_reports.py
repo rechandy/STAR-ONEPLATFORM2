@@ -167,6 +167,13 @@ def doc_tasks():
         '<font color="#1a7f37"><b>VALIDATED</b></font> proven in the prototype · '
         '<font color="#9a6400"><b>PARTIAL</b></font> partly built · '
         '<font color="#b00020"><b>NET-NEW</b></font> to be built.</font>', SMALL))
+    s.append(Spacer(1,8))
+    s.append(Praw("<b>Integrated predictive model (delivered).</b> A scikit-learn logistic-regression model "
+        "predicts each student's likelihood of meeting their IEP goals by annual review and surfaces it as "
+        "color-coded risk — green / yellow / red — on student records and a district-wide leadership roll-up "
+        "(it scores live from the data spine via a dedicated Python service). Built and validated in the "
+        "prototype; the production task below adds a retraining pipeline, drift monitoring, and model "
+        "governance. It directly powers the Planning/Orchestration and Admin/Leadership capabilities.", BODY))
 
     s.append(PageBreak())
     s.append(P("2. Major workstreams",H1)); s.append(rule(BRAND,1.2))
@@ -178,6 +185,7 @@ def doc_tasks():
         ["WS-E","Admin & leadership view (Cap 4)","Usage telemetry, operational dashboards, reporting service & exports","Dev 3"],
         ["WS-F","Security, privacy & FERPA","Encryption, authz, secrets, FERPA controls, pen test, SOC 2 readiness","Tech Lead (cross-cutting)"],
         ["WS-G","Quality, accessibility & UAT","Test automation, e2e/contract, WCAG, load testing, pilot UAT","QA Analyst + all"],
+        ["WS-H","Predictive model (MLOps)","Productionize scoring service; scheduled retraining, drift & performance monitoring, model registry, bias/fairness review","Tech Lead + Dev 1"],
     ]
     s.append(make_table(["ID","Workstream","Scope","Primary owners"],rows,
         [0.45*inch,1.75*inch,2.85*inch,1.35*inch]))
@@ -244,6 +252,7 @@ def gantt_mvp():
         ("WS-D · Planning/orchestr. (C2)",  [0,0,1,1,1,0,0,0]),
         ("WS-E · Admin & leadership (C4)",   [0,0,0,1,1,1,0,0]),
         ("WS-F · Security / FERPA",          [2,2,2,2,1,1,1,0]),
+        ("WS-H · Predictive model (MLOps)",  [0,0,1,1,1,2,0,0]),
         ("WS-G · QA, a11y & UAT",            [0,2,2,2,2,1,1,1]),
         ("Pilot UAT → production deploy",    [0,0,0,0,0,0,2,1]),
     ]
@@ -443,6 +452,9 @@ def doc_readiness():
         "At-least-once durability: events survived a consumer outage and drained on restart — no data loss.",
         "Clean service boundaries (no cross-service DB access) with per-consumer CQRS read models.",
         "Offline-first client (IndexedDB outbox + cursor delta-sync) confirmed in a real browser.",
+        "Integrated predictive model: a scikit-learn logistic regression (hold-out accuracy 0.74, ROC-AUC "
+        "0.81) scores IEP goal attainment and is surfaced as color-coded risk on student records plus a "
+        "leadership roll-up — served by a dedicated Python service over the shared data spine.",
     ])
 
     s.append(PageBreak())
@@ -450,6 +462,7 @@ def doc_readiness():
     sc=[
         ("Architecture & service design","G","4.5","Sound, validated event-driven design; productionize, don't redesign"),
         ("Assignment & Progress (Cap 3)","G","4.0","Proven teacher loop; needs hardening & scale"),
+        ("Predictive model (goal risk)","A","3.0","Built & integrated (logreg, risk-banded); needs retraining pipeline, drift monitoring & governance"),
         ("Cloud infrastructure","R","1.5","Local processes + single DB; no LB, auto-scaling, cache, or CDN"),
         ("Security (encryption/authz/secrets)","R","1.0","Demo cookie auth; secrets in .env; no at-rest encryption config"),
         ("FERPA / student-data compliance","R","1.0","No DPAs, retention, DSAR, audit logging, or SOC 2 — top blocker"),
@@ -464,7 +477,7 @@ def doc_readiness():
     rows=[[Paragraph(esc(n),TDB),status_cell({"G":"GREEN","A":"AMBER","R":"RED"}[k],k),Paragraph(esc(v),TDC),Paragraph(esc(t),TDM)] for n,k,v,t in sc]
     s.append(make_table(["Domain","Status","Score","Summary"],rows,[1.75*inch,0.7*inch,0.5*inch,3.45*inch]))
     s.append(Spacer(1,4))
-    s.append(Praw('<font size=8 color="#0a2540"><b>Overall: 2.2 / 5.0</b> — a validated MVP, not yet '
+    s.append(Praw('<font size=8 color="#0a2540"><b>Overall: 2.3 / 5.0</b> — a validated MVP, not yet '
         'production-ready. <font color="#5b6b7b">Green ≥ 3.5 · Amber 2.0–3.4 · Red &lt; 2.0.</font></font>', SMALL))
 
     s.append(PageBreak())
@@ -529,9 +542,22 @@ def doc_readiness():
         ["In-memory / Kafka broker","Amazon MSK + Schema Registry","Already validated on Kafka; add registry + DLQ"],
         ["Single-instance outbox relay","Relay workers (SKIP LOCKED) or CDC","Remove single point of failure"],
         ["Next.js web (`next start`)","Web app on EKS behind ALB + CloudFront","Containerized, autoscaled, CDN-fronted"],
+        ["Python prediction service (uvicorn)","Prediction service (containerized) + retraining job","Scale horizontally; scheduled retraining; model registry"],
     ]
     s.append(make_table(["Prototype component","Production service(s)","Production change"],rows,
         [2.0*inch,2.2*inch,2.2*inch]))
+    s.append(Spacer(1,8))
+    s.append(P("Predictive model — path to production (MLOps)",H2))
+    s.append(ct_table([
+        ("Model serving","FastAPI loads a joblib artifact","Containerized service (autoscaled) loading from a versioned model registry (S3/MLflow)"),
+        ("Feature pipeline","Live reads from the co-located DB","Service-owned read model fed by the student.metric.v1 event backbone; reproducible feature set"),
+        ("Retraining","Manual `train.py`","Scheduled retraining + offline evaluation gate before promotion; reproducible runs"),
+        ("Monitoring","None","Prediction & data drift, calibration, and performance dashboards with alerts"),
+        ("Governance","Model card (metrics + coefficients)","Bias/fairness review across student subgroups; human-in-the-loop; FERPA-aware audit of inferences"),
+    ]))
+    s.append(Praw("<b>Recommendation:</b> the model is integrated and useful today; treat it as decision "
+        "<i>support</i> (a teacher/leadership flag), keep a human in the loop, and add the MLOps controls above "
+        "before it influences any high-stakes action.", BODY))
 
     s.append(P("9. DNS & networking",H1)); s.append(rule(BRAND,1.2))
     s.append(ct_table([
@@ -552,8 +578,9 @@ def doc_readiness():
         ["P1","Live roster connectors + identity dedup","Real onboarding at scale"],
         ["P1","Load test to initial scale + DR/backup drill","Reliability evidence"],
         ["P1","Planning/Orchestration + Admin dashboards live","Complete the MVP surface"],
+        ["P2","Model MLOps: retraining, drift monitoring, bias review","Keep predictions trustworthy & governed over time"],
     ]
-    rows2=[[status_cell(p,"R" if p=="P0" else "A"),Paragraph(esc(i),TDB),Paragraph(esc(w),TDM)] for p,i,w in rows]
+    rows2=[[status_cell(p,{"P0":"R","P1":"A","P2":"G"}[p]),Paragraph(esc(i),TDB),Paragraph(esc(w),TDM)] for p,i,w in rows]
     s.append(make_table(["Pri","Gate","Why it gates go-live"],rows2,[0.5*inch,2.65*inch,2.75*inch]))
     s.append(Spacer(1,4))
     s.append(Praw('<font size=8 color="#5b6b7b"><i>Assessment basis: live verification of the running services '

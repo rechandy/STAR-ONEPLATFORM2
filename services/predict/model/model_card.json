@@ -1,0 +1,69 @@
+{
+  "model": "LogisticRegression (scikit-learn)",
+  "task": "Predict probability a student meets an IEP goal by annual review",
+  "trained_at": "2026-06-10T12:13:41.693804+00:00",
+  "n_total": 4267,
+  "n_train": 3413,
+  "n_test": 854,
+  "label_balance": {
+    "met": 2041,
+    "not_met": 2226
+  },
+  "metrics": {
+    "accuracy": 0.74,
+    "roc_auc": 0.8112,
+    "confusion_matrix": [
+      [
+        343,
+        103
+      ],
+      [
+        119,
+        289
+      ]
+    ]
+  },
+  "features": {
+    "numeric": [
+      "age",
+      "days_remaining_to_review",
+      "total_sessions",
+      "weeks_in_program",
+      "sessions_per_week",
+      "baseline_prompt_level",
+      "current_prompt_level",
+      "prompt_level_change",
+      "baseline_accuracy",
+      "current_accuracy",
+      "accuracy_trend_per_week",
+      "consecutive_progress_sessions"
+    ],
+    "categorical": [
+      "goal_domain"
+    ]
+  },
+  "bands": {
+    "green": ">= 0.75 On Track",
+    "yellow": "0.50-0.74 Monitor",
+    "red": "< 0.50 At Risk"
+  },
+  "coefficients_by_impact": {
+    "current_accuracy": 0.5021,
+    "accuracy_trend_per_week": 0.2942,
+    "prompt_level_change": 0.2127,
+    "consecutive_progress_sessions": 0.1804,
+    "total_sessions": 0.1709,
+    "current_prompt_level": 0.1508,
+    "goal_domain_communication": -0.1491,
+    "goal_domain_behavior_self_regulation": 0.1404,
+    "baseline_accuracy": -0.1243,
+    "days_remaining_to_review": 0.1077,
+    "goal_domain_daily_living": 0.1014,
+    "goal_domain_social_skills": -0.0695,
+    "age": -0.0456,
+    "baseline_prompt_level": 0.0379,
+    "weeks_in_program": -0.0205,
+    "goal_domain_academic_readiness": -0.0182,
+    "sessions_per_week": -0.0002
+  }
+}
