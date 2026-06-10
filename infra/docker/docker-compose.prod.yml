@@ -1,0 +1,196 @@
+# ===========================================================================
+# STAR OnePlatform — production deployment (single-host / Coolify).
+#
+# Groups the full event-backbone stack as long-running containers so the
+# transactional-outbox relays and Kafka consumers stay ALIVE (the persistent
+# server-side execution that serverless/Hostinger could not provide):
+#   postgres · redpanda(kafka) · migrate(one-shot) · roster-graph ·
+#   student-record · soler · links · predict · web
+#
+# Usage (from repo root):
+#   cp infra/docker/.env.production.example infra/docker/.env   # then edit secrets
+#   docker compose -f infra/docker/docker-compose.prod.yml up -d --build
+#
+# Only `web` is published; every other service talks over the internal network.
+# ===========================================================================
+
+x-app-env: &db-env
+  DATABASE_URL: "postgresql://${POSTGRES_USER:-oneplatform}:${POSTGRES_PASSWORD:-oneplatform}@postgres:5432/${POSTGRES_DB:-oneplatform}?schema=public"
+
+x-kafka-env: &kafka-env
+  EVENT_BROKER: "kafka"
+  KAFKA_BROKERS: "redpanda:9092"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-oneplatform}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oneplatform}
+      POSTGRES_DB: ${POSTGRES_DB:-oneplatform}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oneplatform} -d ${POSTGRES_DB:-oneplatform}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.7
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+    volumes:
+      - redpanda:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: migrate + seed, then exit. Services wait for it to complete.
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.migrate
+    environment:
+      <<: *db-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  roster-graph:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.nest
+      args: { SERVICE: "@oneplatform/roster-graph", APP: "roster-graph" }
+    restart: unless-stopped
+    environment:
+      <<: *db-env
+      PORT: "3001"
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  student-record:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.nest
+      args: { SERVICE: "@oneplatform/student-record", APP: "student-record" }
+    restart: unless-stopped
+    environment:
+      <<: [*db-env, *kafka-env]
+      PORT: "3002"
+      KAFKA_CLIENT_ID: "student-record"
+      KAFKA_GROUP_ID: "student-record"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redpanda: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/api/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  soler:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.nest
+      args: { SERVICE: "@oneplatform/soler", APP: "soler" }
+    restart: unless-stopped
+    environment:
+      <<: [*db-env, *kafka-env]
+      PORT: "3003"
+      KAFKA_CLIENT_ID: "soler"
+      KAFKA_GROUP_ID: "soler"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redpanda: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3003/api/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  links:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.nest
+      args: { SERVICE: "@oneplatform/links", APP: "links" }
+    restart: unless-stopped
+    environment:
+      <<: [*db-env, *kafka-env]
+      PORT: "3004"
+      KAFKA_CLIENT_ID: "links"
+      KAFKA_GROUP_ID: "links"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redpanda: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3004/api/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  predict:
+    build:
+      context: ../..
+      dockerfile: services/predict/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *db-env
+      PORT: "3005"
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:3005/api/readyz').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      ROSTER_GRAPH_URL: "http://roster-graph:3001"
+      STUDENT_RECORD_URL: "http://student-record:3002"
+      SOLER_URL: "http://soler:3003"
+      LINKS_URL: "http://links:3004"
+      PREDICT_URL: "http://predict:3005"
+      SYNC_TENANT: "${TENANT:-star-demo}"
+      SYNC_DEMO_STAFF: "${SYNC_DEMO_STAFF:-T0026}"
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      roster-graph: { condition: service_healthy }
+      predict: { condition: service_healthy }
+      soler: { condition: service_healthy }
+      links: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  redpanda:

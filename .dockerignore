@@ -1,0 +1,16 @@
+# Keep the build context small and avoid copying host artifacts that must be
+# rebuilt inside the image (esp. node_modules with platform-specific binaries
+# and Windows symlinks).
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+.git
+.github
+**/*.log
+**/.env
+!**/.env.example
+_deploytest
+docs/reports/*.pdf
+**/*.tsbuildinfo

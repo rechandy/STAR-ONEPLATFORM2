@@ -1,0 +1,16 @@
+# syntax=docker/dockerfile:1
+# ---------------------------------------------------------------------------
+# One-shot migrator/seeder: applies Prisma migrations and seeds the demo
+# dataset, then exits. Run before the services start (compose depends_on).
+# Build from the REPO ROOT:
+#   docker build -f infra/docker/Dockerfile.migrate -t op-migrate .
+# ---------------------------------------------------------------------------
+FROM node:20-alpine
+RUN apk add --no-cache openssl && corepack enable
+WORKDIR /repo
+COPY . .
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+RUN pnpm --filter @oneplatform/database exec prisma generate
+# Apply migrations, then seed (idempotent: createMany(skipDuplicates)).
+CMD ["sh", "-c", "pnpm --filter @oneplatform/database exec prisma migrate deploy && pnpm --filter @oneplatform/database run db:seed"]

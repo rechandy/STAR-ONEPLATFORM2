@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+# ---------------------------------------------------------------------------
+# Production image for the NestJS services in the pnpm + Turborepo workspace
+# (roster-graph, student-record, soler, links). One parameterized Dockerfile,
+# DRY across all four — pass the package name + app dir as build args.
+#
+# Build from the REPO ROOT:
+#   docker build -f infra/docker/Dockerfile.nest \
+#       --build-arg SERVICE=@oneplatform/roster-graph --build-arg APP=roster-graph \
+#       -t op-roster-graph .
+#
+# Note: the runtime copies the built workspace wholesale, which keeps the
+# Prisma client + pnpm workspace symlinks intact and correct. It trades image
+# size for reliability; slimming via `pnpm deploy` is a documented follow-up.
+# ---------------------------------------------------------------------------
+ARG NODE_VERSION=20-alpine
+
+FROM node:${NODE_VERSION} AS base
+RUN apk add --no-cache libc6-compat openssl
+RUN corepack enable
+WORKDIR /repo
+
+FROM base AS build
+ARG SERVICE
+COPY . .
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+# Services import "@prisma/client" directly; the schema lives in @oneplatform/database.
+RUN pnpm --filter @oneplatform/database exec prisma generate
+# Turbo builds the service AND its workspace deps (^build): @oneplatform/{authz,events}.
+RUN pnpm exec turbo run build --filter=${SERVICE}
+
+FROM node:${NODE_VERSION} AS runtime
+ARG APP
+RUN apk add --no-cache openssl
+ENV NODE_ENV=production
+ENV SERVICE_NAME=${APP}
+WORKDIR /app
+COPY --from=build --chown=node:node /repo ./
+USER node
+WORKDIR /app/services/${APP}
+# PORT is supplied by the environment (compose / Coolify); the app reads it via config.
+CMD ["node", "dist/main.js"]
