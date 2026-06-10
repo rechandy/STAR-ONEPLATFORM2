@@ -1,3 +1,6 @@
 # Demo narration generator (docs/demo/generate_narration.py)
 elevenlabs>=1.0
-pydub>=0.25            # clean joins + timeline alignment; requires ffmpeg on PATH
+truststore>=0.9                          # verify TLS via the OS trust store (corporate proxies)
+imageio-ffmpeg>=0.5                       # bundled ffmpeg for unified-track encoding (no system ffmpeg needed)
+mutagen>=1.47                             # optional: report output durations
+pydub>=0.25 ; python_version < "3.13"     # timeline alignment (needs stdlib audioop, removed in 3.13)

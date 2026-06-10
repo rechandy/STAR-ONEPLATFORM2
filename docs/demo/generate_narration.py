@@ -36,7 +36,10 @@ import argparse
 import io
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -99,7 +102,19 @@ def make_client():
     key = os.environ.get("ELEVENLABS_API_KEY")
     if not key:
         sys.exit("ERROR: set ELEVENLABS_API_KEY")
-    return ElevenLabs(api_key=key)
+    # Verify TLS against the OS trust store when truststore is available — this
+    # works behind corporate TLS-intercepting proxies (whose root CA lives in
+    # the OS store, not in certifi) without disabling certificate verification.
+    httpx_client = None
+    try:
+        import ssl
+        import httpx
+        import truststore
+        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        httpx_client = httpx.Client(verify=ctx, timeout=120)
+    except Exception:
+        pass
+    return ElevenLabs(api_key=key, httpx_client=httpx_client) if httpx_client else ElevenLabs(api_key=key)
 
 
 def list_voices() -> None:
@@ -127,15 +142,57 @@ def synth_segment(client, text: str, voice_id: str, model: str) -> bytes:
 # --------------------------------------------------------------------------- #
 # Stitch the unified track.
 # --------------------------------------------------------------------------- #
-def build_unified(clips: list[bytes], starts: list[int], out_path: Path, gap_ms: int, align: bool) -> None:
-    """Prefer pydub (clean joins + timeline alignment); fall back to byte concat."""
+def _ffmpeg_exe() -> str | None:
+    """System ffmpeg if present, else the pip-bundled imageio-ffmpeg binary."""
+    if shutil.which("ffmpeg"):
+        return "ffmpeg"
     try:
-        from pydub import AudioSegment
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
     except Exception:
-        print("  (pydub/ffmpeg unavailable -> plain concatenation, no timeline alignment)")
-        with open(out_path, "wb") as f:
-            for i, clip in enumerate(clips):
-                f.write(clip)
+        return None
+
+
+def _ffmpeg_concat(ff: str, clips: list[bytes], out_path: Path, gap_ms: int) -> None:
+    """Re-encode a single, valid MP3 from the clips with `gap_ms` silence between them."""
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        sil = td / "sil.mp3"
+        subprocess.run(
+            [ff, "-y", "-f", "lavfi", "-i", "anullsrc=channel_layout=mono:sample_rate=44100",
+             "-t", f"{gap_ms/1000:.3f}", "-c:a", "libmp3lame", "-b:a", "128k", str(sil)],
+            check=True, capture_output=True,
+        )
+        lines = []
+        for i, clip in enumerate(clips):
+            p = td / f"c{i:02d}.mp3"
+            p.write_bytes(clip)
+            lines.append(f"file '{p.as_posix()}'")
+            if i < len(clips) - 1:
+                lines.append(f"file '{sil.as_posix()}'")
+        lst = td / "list.txt"
+        lst.write_text("\n".join(lines), encoding="utf-8")
+        subprocess.run(
+            [ff, "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
+             "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100", str(out_path)],
+            check=True, capture_output=True,
+        )
+    print(f"  (concatenated via ffmpeg with {gap_ms}ms gaps)")
+
+
+def build_unified(clips: list[bytes], starts: list[int], out_path: Path, gap_ms: int, align: bool) -> None:
+    """Prefer pydub (timeline alignment); else ffmpeg concat; else raw byte concat."""
+    try:
+        from pydub import AudioSegment  # needs audioop (py<3.13) + ffmpeg
+    except Exception:
+        ff = _ffmpeg_exe()
+        if ff:
+            _ffmpeg_concat(ff, clips, out_path, gap_ms)
+        else:
+            print("  (no pydub/ffmpeg -> raw byte concat; duration metadata may be approximate)")
+            with open(out_path, "wb") as f:
+                for clip in clips:
+                    f.write(clip)
         return
 
     master = AudioSegment.empty()
