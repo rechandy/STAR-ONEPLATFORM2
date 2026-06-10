@@ -1,0 +1,8 @@
+# Caddy terminates HTTPS (automatic Let's Encrypt) for the public domain and
+# reverse-proxies to the web container over the internal compose network.
+# SITE_ADDRESS is supplied by the environment (the domain, e.g.
+# ruben-star-one-platform.com).
+{$SITE_ADDRESS} {
+	reverse_proxy web:3000
+	encode zstd gzip
+}

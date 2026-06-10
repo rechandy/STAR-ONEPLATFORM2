@@ -1,0 +1,27 @@
+# TLS + custom-domain layer for a public VPS deploy. Run alongside the prod
+# stack (from the repo root):
+#   SITE_ADDRESS=ruben-star-one-platform.com \
+#     docker compose -f infra/docker/docker-compose.prod.yml \
+#                    -f infra/docker/docker-compose.tls.yml up -d
+#
+# Caddy listens on 80/443, provisions a Let's Encrypt cert for SITE_ADDRESS
+# (the domain's A record must point at this host first), and proxies to `web`.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS to your public domain}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
