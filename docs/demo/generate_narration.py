@@ -78,6 +78,9 @@ def parse_script(path: Path) -> list[dict]:
             continue
         start = int(m.group(1)) * 60 + int(m.group(2))
         text = cells[2].strip().strip('"').strip().strip('"').strip()
+        # Strip markdown emphasis/code markers so TTS doesn't read them aloud.
+        text = text.replace("**", "").replace("`", "").replace("*", "")
+        text = re.sub(r"\s{2,}", " ", text).strip()
         if not text:
             continue
         segments.append(
